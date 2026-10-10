@@ -1,0 +1,48 @@
+---
+description: FourForces Watch project conventions (adapters, schema, secrets, tests, open-source hygiene)
+globs: ["**/*.py", "cities/*.yaml", "web/**", "*.md"]
+alwaysApply: true
+---
+
+# FourForces Watch: project rules
+
+## Architecture (keep the layers separate)
+- **L0 adapters** (`adapters/<force>/<source>.py`): one module per public source per force.
+- **L1 force rules** (`forces/`): turn observations into an ok / watch / alert status per neighborhood.
+- **L2 city packs** (`cities/<city>.yaml`): all city-specific values (bbox, stations, zones, neighborhoods, thresholds).
+  Never hard-code a city in an adapter. Read it from the `city` dict.
+- **L3 open API + dashboard** (`app.py`, `web/`): JSON, GeoJSON (`/api/geojson`), CAP 1.2 (`/api/cap`), status (`/api/status`).
+
+## Adapter interface
+Every adapter module exposes:
+```python
+NAME = "source_name"          # unique, snake_case
+FORCE = "water" | "air" | "land" | "fire"
+def fetch(city: dict) -> list[Observation]: ...
+```
+- Return only `core.schema.Observation` objects:
+  - fields: force, source, place{id,name,lat,lon}, time (UTC ISO), measurement, value, unit, threshold, status, extra;
+  - `status` is one of ok / watch / alert / unknown.
+- Missing key or config → `raise SkipAdapter("reason")`. Never crash the refresh loop.
+- Use `core.http.client()` (polite User-Agent and timeouts). Respect each feed's terms. Never store third-party camera imagery.
+- Add the feed to the README feed table and to `cities/_template.yaml` if it needs config.
+
+## Secrets
+- Never commit secrets, keys, tokens or `.env`. Read them from environment variables only (`XAI_API_KEY`,
+  `AIRNOW_API_KEY`, `PURPLEAIR_API_KEY`, `FIRMS_MAP_KEY`) and document new ones in `.env.example` with an empty value.
+- Code must degrade gracefully without any key: cameras show "not checked", messages fall back to templates.
+
+## Tests
+- Every new adapter, rule or export needs a test in `tests/`. Tests must run offline: parse recorded sample payloads
+  or monkeypatch HTTP, never hit live APIs.
+- Run `pytest -q` before merging. CI (`.github/workflows/tests.yml`) runs it on every push and pull request.
+
+## Workflow
+- Work on a feature branch (`feature/water`, `feature/air`, `feature/land`, `feature/fire`, `feature/dashboard`,
+  `feature/demo`, `docs/roadmap`) → tests pass → merge to `main` → deploy. Don't rewrite published history.
+
+## Open-source hygiene
+- MIT license. Public, generic civic-tech content only: no proprietary, company or client content, no private
+  roadmaps, no vendor recommendations.
+- Simulated / demo data must always be labelled SIMULATED in the UI and API (`extra.simulated = true`).
+- This is not an official warning system. Wording points users to NWS and county emergency management.
