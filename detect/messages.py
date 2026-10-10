@@ -82,14 +82,17 @@ def _template(name, overall, statuses, tips=None):
 
 
 def neighborhood_message(city_name: str, name: str, overall: str, statuses: dict, facts: list[str],
-                         tips: dict | None = None) -> dict:
-    """``tips`` maps a force to a tip key when its cause matters (e.g. air -> air_quality or storm)."""
+                         tips: dict | None = None, ai: bool = True) -> dict:
+    """``tips`` maps a force to a tip key when its cause matters (e.g. air -> air_quality or storm).
+
+    ``ai=False`` never calls Grok: it returns a message Grok already wrote for these exact facts, else the
+    template. The refresh uses it to publish the board instantly, then fills in Grok messages afterwards."""
     have_ai = grok.available()
     key = hashlib.sha1(json.dumps([name, statuses, sorted(facts)[:8], have_ai, tips], sort_keys=True).encode()).hexdigest()
     if key in _cache:
         return _cache[key]
     msg = None
-    if have_ai:
+    if have_ai and ai:
         try:
             j = grok.parse_json(grok.generate_text(PROMPT.format(
                 city=city_name, name=name, statuses=json.dumps(statuses),

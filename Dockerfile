@@ -6,6 +6,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=app:app . .
+# WORKDIR is created root-owned: give it to app so it can write .cache/ (Grok vision cache) at runtime
+RUN chown app:app /app
 USER app
 EXPOSE 7860
 CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-7860}"]

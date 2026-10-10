@@ -8,6 +8,9 @@ Env:
     XAI_VISION_MODEL   image flood check model (default grok-4.7)
     XAI_TEXT_MODEL     trilingual message model (default grok-4.20-0309-non-reasoning)
     XAI_IMAGE_DETAIL   low | high (default high)
+    XAI_TIMEOUT        seconds per xAI call (default 20)
+    XAI_CONCURRENCY    max xAI calls in flight at once (default 4)
+    GROK_CACHE_DIR     where the vision cache is written (default ./.cache; failures are non-fatal)
 
 Vision results are cached per image SHA-256, so an unchanged snapshot is never re-sent.
 Requests set store=false (xAI advises not storing history when sending images).
@@ -27,10 +30,14 @@ import httpx
 
 log = logging.getLogger("grok")
 API = os.getenv("XAI_BASE_URL", "https://api.x.ai/v1").rstrip("/")
-CACHE_PATH = Path(__file__).resolve().parent.parent / ".cache" / "grok_vision.json"
+CACHE_PATH = Path(os.getenv("GROK_CACHE_DIR") or Path(__file__).resolve().parent.parent / ".cache") / "grok_vision.json"
+TIMEOUT = float(os.getenv("XAI_TIMEOUT", "20"))
+CONCURRENCY = max(1, int(os.getenv("XAI_CONCURRENCY", "4")))
+_slots = threading.BoundedSemaphore(CONCURRENCY)  # caps xAI calls in flight across all threads
 _lock = threading.Lock()
 _cache: dict[str, dict] = {}
 _warned = False
+_save_warned = False
 
 PROMPT = (
     "You are checking a single traffic-camera or street photo for flooding. "
@@ -85,15 +92,18 @@ def _output_text(resp: dict) -> str:
     return "".join(parts)
 
 
-def respond(content: list[dict], model: str, max_tokens: int = 400, timeout: float = 90) -> str:
-    """POST /v1/responses with one user message; returns the output text."""
+def respond(content: list[dict], model: str, max_tokens: int = 400, timeout: float | None = None) -> str:
+    """POST /v1/responses with one user message; returns the output text.
+
+    At most CONCURRENCY calls run at once; each is bounded by ``timeout`` (default XAI_TIMEOUT)."""
     key = api_key()
     if not key:
         return ""
     body = {"model": model, "store": False, "max_output_tokens": max_tokens,
             "input": [{"role": "user", "content": content}]}
-    r = httpx.post(f"{API}/responses", json=body, timeout=timeout,
-                   headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    with _slots:
+        r = httpx.post(f"{API}/responses", json=body, timeout=timeout or TIMEOUT,
+                       headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     if r.status_code >= 400:
         raise RuntimeError(f"xAI API {r.status_code}: {r.text[:200]}")
     return _output_text(r.json())
@@ -110,6 +120,18 @@ def _load():
             _cache = json.loads(CACHE_PATH.read_text())
         except Exception:
             _cache = {}
+
+
+def _save():
+    """Persist the vision cache; a read-only disk (e.g. a container's root-owned /app) must never break a refresh."""
+    global _save_warned
+    try:
+        CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        CACHE_PATH.write_text(json.dumps(_cache))
+    except OSError as e:
+        if not _save_warned:
+            log.warning("vision cache not written (%s); keeping it in memory only", e)
+            _save_warned = True
 
 
 def classify_image(image: bytes, mime: str = "image/jpeg") -> dict:
@@ -138,8 +160,7 @@ def classify_image(image: bytes, mime: str = "image/jpeg") -> dict:
     if result["water_on_road"] is not None:
         with _lock:
             _cache[digest] = result
-            CACHE_PATH.parent.mkdir(exist_ok=True)
-            CACHE_PATH.write_text(json.dumps(_cache))
+            _save()
     return {**result, "cached": False, "image_sha256": digest}
 
 

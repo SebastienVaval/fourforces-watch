@@ -35,7 +35,8 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger("app")
 ROOT = Path(__file__).resolve().parent
 REFRESH = int(os.getenv("REFRESH_SECONDS", "300"))
-MAX_CLASSIFY = int(os.getenv("MAX_CLASSIFY", "12"))
+MAX_CLASSIFY = int(os.getenv("MAX_CLASSIFY", "12"))  # cameras sent to Grok per refresh cycle
+GROK_WORKERS = max(1, int(os.getenv("XAI_CONCURRENCY", "4")))
 
 
 class State:
@@ -48,8 +49,9 @@ class State:
         self.detections: dict[str, dict] = {}  # camera place.id -> last Grok result
         self.rotation = 0
         self.board: list[dict] = []
-        self.last_refresh: str | None = None
+        self.last_refresh: str | None = None  # set when the board is first published (before Grok work)
         self.refreshing = False
+        self.ai_pending = False  # Grok camera checks / messages still running for the published board
 
     def all_obs(self) -> list[Observation]:
         with self.lock:
@@ -81,7 +83,7 @@ def _fetch_image(cam: Observation) -> tuple[bytes, str] | None:
         p = Path(cam.extra["local_image"])
         return (p.read_bytes(), "image/jpeg") if p.exists() else None
     try:  # transient, in memory only: FL511 snapshots are never written to disk
-        with client(timeout=15) as c:
+        with client(timeout=10) as c:
             r = c.get(cam.extra["image_url"])
         if r.status_code != 200 or len(r.content) < 2000:
             return None
@@ -116,6 +118,78 @@ def classify_camera(cam: Observation) -> dict:
     return res
 
 
+def _message_inputs(t: dict) -> tuple[dict, list[str], dict]:
+    statuses = {f: v["status"] for f, v in t["forces"].items()}
+    facts = [r for v in t["forces"].values() for r in v["reasons"]]
+    ctx = t["forces"]["fire"].get("context") or {}
+    if t["forces"]["fire"]["status"] in ("watch", "alert") and ctx.get("cooling_centers"):
+        cc = ctx["cooling_centers"][0]
+        facts.append(f"Nearest cooling center: {cc['name']} ({cc['km']} km)")
+    lc = t["forces"]["land"].get("context") or {}
+    if t["forces"]["land"]["status"] in ("watch", "alert") and lc.get("nearest_shelter"):
+        sh = lc["nearest_shelter"]
+        facts.append(f"Nearest open shelter: {sh['name']} ({sh['km']} km)")
+    aq = (t["forces"]["air"].get("context") or {}).get("aqi") or {}
+    tips = {"air": "air_quality" if aq.get("status") in ("watch", "alert") else "storm"}
+    if aq.get("status") in ("watch", "alert"):
+        facts.append(f"Air quality index {aq['aqi']} ({aq['category']}), {aq['source']}"
+                     + (" - SIMULATED demo reading" if aq.get("simulated") else ""))
+    return statuses, facts, tips
+
+
+def _tile_message(t: dict, ai: bool) -> dict:
+    statuses, facts, tips = _message_inputs(t)
+    return messages.neighborhood_message(S.city["name"], t["name"], t["status"], statuses, facts, tips=tips, ai=ai)
+
+
+def _build_tiles() -> list[dict]:
+    """Rule engine + instant messages (Grok's if already written for these facts, else templates). No network."""
+    tiles = build_board(S.all_obs(), S.city)
+    for t in tiles:
+        t["message"] = _tile_message(t, ai=False)
+    return tiles
+
+
+def _publish(tiles: list[dict], ai_pending: bool):
+    with S.lock:
+        S.board, S.last_refresh, S.ai_pending = tiles, utcnow_iso(), ai_pending
+
+
+def message_label(tiles: list[dict], key_present: bool, ai_pending: bool) -> str:
+    """Who wrote the board messages, as shown next to 'Messages written by' on the page."""
+    by = next((m for m in ((t.get("message") or {}).get("by") for t in tiles) if m and m != "template"), None)
+    if by:
+        return by
+    if not key_present:
+        return "templates (no xAI key)"
+    return "templates (Grok messages loading\u2026)" if ai_pending or not tiles else "templates (Grok unavailable)"
+
+
+def _safe_classify(cam: Observation):
+    try:
+        return classify_camera(cam)
+    except Exception as e:  # one camera never aborts the refresh
+        log.warning("camera check failed %s: %s", cam.place.id, e)
+        return None
+
+
+def _grok_messages(tiles: list[dict]):
+    """Ask Grok for the messages still on templates, GROK_WORKERS at a time; update each tile as it lands."""
+    todo = [t for t in tiles if (t.get("message") or {}).get("by") == "template"]
+
+    def one(t):
+        try:
+            msg = _tile_message(t, ai=True)
+        except Exception as e:
+            log.warning("grok message failed for %s: %s", t["name"], e)
+            return
+        with S.lock:
+            t["message"] = msg
+
+    with ThreadPoolExecutor(max_workers=GROK_WORKERS) as ex:
+        list(ex.map(one, todo))
+
+
 def refresh():
     if S.refreshing:
         return
@@ -142,41 +216,34 @@ def refresh():
         cams = S.cameras()
         demo_cams = demo_mode.apply(cams, S.city) if demo_mode.enabled() else []
         for cam in cams:
-            _apply_detection(cam)
+            _apply_detection(cam)  # last cycle's Grok verdicts show immediately
+        use_ai = grok.available()
+        # 1) publish right away: feeds + rules + instant messages. The board never waits on Grok.
+        _publish(_build_tiles(), ai_pending=use_ai)
+        log.info("board published in %.1fs (Grok work %s)", time.time() - t0, "next" if use_ai else "off")
+        # 2) Grok camera checks, bounded: MAX_CLASSIFY cameras, GROK_WORKERS at a time, XAI_TIMEOUT per call
         todo = list(demo_cams)  # demo cameras first, then rotate through the rest
-        if cams and grok.available():
+        if cams and use_ai:
             rest = [c for c in cams if c not in demo_cams]
             n = max(0, min(MAX_CLASSIFY - len(todo), len(rest)))
             todo += [rest[(S.rotation + i) % len(rest)] for i in range(n)]
             S.rotation = (S.rotation + n) % max(len(rest), 1)
-        with ThreadPoolExecutor(max_workers=4) as ex:
-            list(ex.map(classify_camera, todo))
-        tiles = build_board(S.all_obs(), S.city)
-        for t in tiles:
-            statuses = {f: v["status"] for f, v in t["forces"].items()}
-            facts = [r for v in t["forces"].values() for r in v["reasons"]]
-            ctx = t["forces"]["fire"].get("context") or {}
-            if t["forces"]["fire"]["status"] in ("watch", "alert") and ctx.get("cooling_centers"):
-                cc = ctx["cooling_centers"][0]
-                facts.append(f"Nearest cooling center: {cc['name']} ({cc['km']} km)")
-            lc = t["forces"]["land"].get("context") or {}
-            if t["forces"]["land"]["status"] in ("watch", "alert") and lc.get("nearest_shelter"):
-                sh = lc["nearest_shelter"]
-                facts.append(f"Nearest open shelter: {sh['name']} ({sh['km']} km)")
-            aq = (t["forces"]["air"].get("context") or {}).get("aqi") or {}
-            tips = {"air": "air_quality" if aq.get("status") in ("watch", "alert") else "storm"}
-            if aq.get("status") in ("watch", "alert"):
-                facts.append(f"Air quality index {aq['aqi']} ({aq['category']}), {aq['source']}"
-                             + (" - SIMULATED demo reading" if aq.get("simulated") else ""))
-            t["message"] = messages.neighborhood_message(S.city["name"], t["name"], t["status"], statuses, facts,
-                                                         tips=tips)
+        if todo:
+            with ThreadPoolExecutor(max_workers=GROK_WORKERS) as ex:
+                list(ex.map(_safe_classify, todo))
+            _publish(_build_tiles(), ai_pending=use_ai)  # camera verdicts in, Grok messages reused when unchanged
+        # 3) Grok messages, written into the published tiles one by one
+        if use_ai:
+            _grok_messages(S.board)
         with S.lock:
-            S.board, S.last_refresh = tiles, utcnow_iso()
+            S.ai_pending = False
         log.info("refresh done in %.1fs: %d observations, %d cameras checked",
                  time.time() - t0, len(S.all_obs()), len(todo))
     except Exception:
         log.exception("refresh failed")
     finally:
+        with S.lock:
+            S.ai_pending = False
         S.refreshing = False
 
 
@@ -217,7 +284,7 @@ def api_status():
             "ai": {"provider": "xAI API (Grok)", "key_present": grok.available(),
                    "vision_model": grok.vision_model(), "text_model": grok.text_model(),
                    "cameras_checked": sum(1 for d in S.detections.values() if d.get("water_on_road") is not None)},
-            "last_refresh": S.last_refresh, "refreshing": S.refreshing, "refresh_seconds": REFRESH,
+            "last_refresh": S.last_refresh, "refreshing": S.refreshing, "ai_pending": S.ai_pending, "refresh_seconds": REFRESH,
             "adapters": S.adapter_status, "forces": FORCES,
             "overlays": arcgis.overlay_meta(S.city), "basemap": "mapbox" if _mapbox_token() else "carto/osm"}
 
@@ -280,7 +347,10 @@ def api_tide():
 @app.get("/api/board")
 @app.get("/api/hazards")
 def api_board():
-    return {"generated": S.last_refresh, "demo_mode": demo_mode.enabled(), "tiles": S.board}
+    with S.lock:
+        tiles, pending = list(S.board), S.ai_pending
+    return {"generated": S.last_refresh, "demo_mode": demo_mode.enabled(), "tiles": tiles, "ai_pending": pending,
+            "message_label": message_label(tiles, grok.available(), pending)}
 
 
 @app.get("/api/geojson")
