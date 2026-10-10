@@ -16,3 +16,7 @@ services:
         value: grok-4.20-0309-non-reasoning
       - key: XAI_API_KEY
         sync: false
+      - key: MAPBOX_TOKEN
+        sync: false
+      - key: FIRMS_MAP_KEY
+        sync: false

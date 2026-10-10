@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from adapters.base import SkipAdapter, discover  # noqa: E402
+from core import arcgis  # noqa: E402
 from core.city import load_city  # noqa: E402
 from core.http import client  # noqa: E402
 from core.schema import FORCES, Observation, to_cap, to_geojson, utcnow_iso  # noqa: E402
@@ -197,7 +198,39 @@ def api_status():
                    "vision_model": grok.vision_model(), "text_model": grok.text_model(),
                    "cameras_checked": sum(1 for d in S.detections.values() if d.get("water_on_road") is not None)},
             "last_refresh": S.last_refresh, "refreshing": S.refreshing, "refresh_seconds": REFRESH,
-            "adapters": S.adapter_status, "forces": FORCES}
+            "adapters": S.adapter_status, "forces": FORCES,
+            "overlays": arcgis.overlay_meta(S.city), "basemap": "mapbox" if _mapbox_token() else "carto/osm"}
+
+
+def _mapbox_token() -> str:
+    """Only public Mapbox tokens (pk.*) are ever sent to the browser."""
+    t = os.getenv("MAPBOX_TOKEN", "").strip()
+    return t if t.startswith("pk.") else ""
+
+
+@app.get("/api/config")
+def api_config():
+    """Front-end config. MAPBOX_TOKEN is a public (pk.) browser token; empty -> OSM/CARTO tiles."""
+    return {"mapbox_token": _mapbox_token() or None,
+            "mapbox_style": os.getenv("MAPBOX_STYLE", "mapbox/dark-v11"),
+            "center": S.city.get("center"), "zoom": S.city.get("zoom"),
+            "open_data": {k: arcgis.open_data(S.city).get(k) for k in ("portal", "attribution")}}
+
+
+@app.get("/api/overlays")
+def api_overlays():
+    return arcgis.overlay_meta(S.city)
+
+
+@app.get("/api/overlays/{overlay_id}")
+def api_overlay(overlay_id: str):
+    try:
+        fc = arcgis.overlay_geojson(S.city, overlay_id)
+    except Exception as e:
+        raise HTTPException(502, f"overlay source failed: {str(e)[:200]}")
+    if fc is None:
+        raise HTTPException(404, "overlay not found")
+    return JSONResponse(fc, media_type="application/geo+json", headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/api/observations")
