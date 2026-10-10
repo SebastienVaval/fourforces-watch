@@ -34,6 +34,12 @@ TEMPLATES = {
 # One practical tip per force in watch/alert, appended to the template message.
 TIPS = {
     "water": {"en": "Avoid flooded roads.", "es": "Evite calles inundadas.", "ht": "Pa pase nan lari ki inonde."},
+    "air_quality": {"en": "Air quality: limit outdoor activity, close windows; sensitive groups consider a well-fitting mask.",
+                    "es": "Calidad del aire: limite la actividad al aire libre, cierre las ventanas; los grupos sensibles pueden usar una mascarilla ajustada.",
+                    "ht": "Kalite lè: diminye aktivite deyò, fèmen fenèt yo; moun ki fragil ka mete yon mask byen ajiste."},
+    "storm": {"en": "Follow National Hurricane Center and county updates; secure loose outdoor items.",
+              "es": "Siga al Centro Nacional de Huracanes y al condado; asegure los objetos sueltos al aire libre.",
+              "ht": "Swiv Sant Nasyonal Siklòn ak konte a; mare oswa rantre bagay ki lage deyò."},
     "fire": {"en": "Drink water, limit time outdoors, use a cooling center; report any new fire or smoke to 911.",
              "es": "Tome agua, limite el tiempo al aire libre, use un centro de enfriamiento; reporte fuego o humo al 911.",
              "ht": "Bwè dlo, pa rete twò lontan deyò, ale nan yon sant refwadisman; rapòte nenpòt dife oswa lafimen bay 911."},
@@ -51,20 +57,23 @@ channels for decisions; never give evacuation orders yourself.
 Return ONLY JSON, no markdown: {{"en": "...", "es": "...", "ht": "..."}} (es = Spanish, ht = Haitian Creole)."""
 
 
-def _template(name, overall, statuses):
+def _template(name, overall, statuses, tips=None):
     out = {}
     for lang in ("en", "es", "ht"):
         forces = ", ".join(WORDS[lang][f] for f, s in statuses.items() if s in ("watch", "alert"))
         key = overall if overall in TEMPLATES and forces else "ok"
         out[lang] = TEMPLATES[key][lang].format(name=name, forces=forces)
         if key != "ok":
-            out[lang] += "".join(" " + TIPS[f][lang] for f, s in statuses.items() if s in ("watch", "alert") and f in TIPS)
+            keys = [(tips or {}).get(f, f) for f, s in statuses.items() if s in ("watch", "alert")]
+            out[lang] += "".join(" " + TIPS[k][lang] for k in keys if k in TIPS)
     return out
 
 
-def neighborhood_message(city_name: str, name: str, overall: str, statuses: dict, facts: list[str]) -> dict:
+def neighborhood_message(city_name: str, name: str, overall: str, statuses: dict, facts: list[str],
+                         tips: dict | None = None) -> dict:
+    """``tips`` maps a force to a tip key when its cause matters (e.g. air -> air_quality or storm)."""
     have_ai = grok.available()
-    key = hashlib.sha1(json.dumps([name, statuses, sorted(facts)[:8], have_ai], sort_keys=True).encode()).hexdigest()
+    key = hashlib.sha1(json.dumps([name, statuses, sorted(facts)[:8], have_ai, tips], sort_keys=True).encode()).hexdigest()
     if key in _cache:
         return _cache[key]
     msg = None
@@ -78,7 +87,7 @@ def neighborhood_message(city_name: str, name: str, overall: str, statuses: dict
         except Exception as e:
             log.warning("grok message failed for %s: %s", name, e)
     if msg is None:
-        msg = _template(name, overall, statuses) | {"by": "template"}
+        msg = _template(name, overall, statuses, tips) | {"by": "template"}
         if have_ai:
             return msg  # don't cache the fallback; retry Grok next refresh
     _cache[key] = msg

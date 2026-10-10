@@ -27,6 +27,8 @@ air:
   purpleair: {max_sensors: 60}
   aqi_watch: 101
   aqi_alert: 151
+  sensor_radius_km: 5
+  # demo_sensors: [{name: "...", lat: 0.0, lon: 0.0, aqi: 128}]   # DEMO_MODE only, when no AQI key
   nhc_radius_km: 800
   nhc_alert_radius_km: 300
 

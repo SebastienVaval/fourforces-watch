@@ -26,10 +26,16 @@ water:
     site_thresholds: {}      # optional {site_no: {watch: x, alert: y}}
 
 air:
-  airnow: {distance_miles: 25}
-  purpleair: {max_sensors: 60}
-  aqi_watch: 101
-  aqi_alert: 151
+  airnow: {distance_miles: 25}          # AirNow reporting area around the city center
+  purpleair: {max_sensors: 60, max_age_s: 3600, min_confidence: 50}   # outdoor sensors in bbox
+  aqi_watch: 101             # EPA "Unhealthy for Sensitive Groups"
+  aqi_alert: 151             # EPA "Unhealthy"
+  sensor_radius_km: 5        # tile AQI = median of sensors within this radius, else AirNow area AQI
+  # DEMO_MODE=1 only, and only while AirNow and PurpleAir are both off: clearly labelled SIMULATED sensors
+  demo_sensors:
+    - {name: "Doral (near SR-836 / Palmetto)", lat: 25.810, lon: -80.340, aqi: 128}
+    - {name: "Little Havana", lat: 25.770, lon: -80.220, aqi: 64}
+    - {name: "Miami Beach", lat: 25.795, lon: -80.135, aqi: 38}
   nhc_radius_km: 800         # storm center within 800 km -> watch
   nhc_alert_radius_km: 300   # within 300 km -> alert
 

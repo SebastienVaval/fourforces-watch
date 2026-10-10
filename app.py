@@ -135,6 +135,9 @@ def refresh():
                     S.obs[mod.NAME] = res
         with S.lock:  # simulated hotspots live under their own key, never inside nasa_firms
             S.obs["demo_fire"] = demo_mode.fire_hotspots(S.city) if demo_mode.enabled() else []
+            # simulated AQI sensors only when no real AQI feed is live (no AirNow / PurpleAir key)
+            real_aqi = any(S.adapter_status.get(n, {}).get("ok") for n in ("airnow", "purpleair"))
+            S.obs["demo_air"] = demo_mode.air_sensors(S.city) if demo_mode.enabled() and not real_aqi else []
         cams = S.cameras()
         demo_cams = demo_mode.apply(cams, S.city) if demo_mode.enabled() else []
         for cam in cams:
@@ -155,7 +158,13 @@ def refresh():
             if t["forces"]["fire"]["status"] in ("watch", "alert") and ctx.get("cooling_centers"):
                 cc = ctx["cooling_centers"][0]
                 facts.append(f"Nearest cooling center: {cc['name']} ({cc['km']} km)")
-            t["message"] = messages.neighborhood_message(S.city["name"], t["name"], t["status"], statuses, facts)
+            aq = (t["forces"]["air"].get("context") or {}).get("aqi") or {}
+            tips = {"air": "air_quality" if aq.get("status") in ("watch", "alert") else "storm"}
+            if aq.get("status") in ("watch", "alert"):
+                facts.append(f"Air quality index {aq['aqi']} ({aq['category']}), {aq['source']}"
+                             + (" - SIMULATED demo reading" if aq.get("simulated") else ""))
+            t["message"] = messages.neighborhood_message(S.city["name"], t["name"], t["status"], statuses, facts,
+                                                         tips=tips)
         with S.lock:
             S.board, S.last_refresh = tiles, utcnow_iso()
         log.info("refresh done in %.1fs: %d observations, %d cameras checked",
