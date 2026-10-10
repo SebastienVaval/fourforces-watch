@@ -127,6 +127,19 @@ shelters layer is already polled by `evac_zones` and appears automatically when 
   (one Unhealthy for Sensitive Groups near Doral). Own source `demo_air`, `extra.simulated = true`, SIMULATED names and
   headlines, dashed yellow rings, banner text. They disappear as soon as a real AQI feed is live.
 
+### Land force
+
+- **Sources (no API key):** Miami-Dade hurricane evacuation zone and order flag at each neighborhood point, open shelters
+  and evacuation bus pickups (county ArcGIS layers), OpenFEMA disaster declarations for the county, USGS earthquakes
+  (FDSN bbox query, reusable in any city) and NWS evacuation / civil emergency alerts.
+- **Neighborhood rule** (`land` in the city pack): a county order flag is **watch** ("confirm with official channels")
+  unless `trust_orders: true`; an open FEMA declaration (or one ended < 14 days ago) is **watch** county-wide; an
+  earthquake of `alert_magnitude` (4.5) or more within `alert_km` (50) is **alert**, any within `watch_km` (150) **watch**.
+- **Hazard Board land tile:** evacuation zone, nearest open shelter, nearest evacuation bus pickup, open FEMA
+  declarations (information only; shelters, pickups and hospitals never change a status).
+- **Calm-day demo:** with `DEMO_MODE=1`, `land.demo_evac_orders` adds one **SIMULATED** evacuation order flag (Miami
+  Beach, zone A). Own source `demo_land`, `extra.simulated = true`, SIMULATED headline, named in the page banner.
+
 ### Fire force
 
 - **Satellite hotspots:** NASA FIRMS (VIIRS NOAA-20, NOAA-21, S-NPP and MODIS, last 48 h) in `fire.firms.bbox`, which

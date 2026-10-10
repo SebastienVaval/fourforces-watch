@@ -126,3 +126,28 @@ def air_sensors(city: dict) -> list[Observation]:
                    "note": "Demo only (DEMO_MODE=1, no AirNow/PurpleAir key). Not a real reading."},
         ))
     return out
+
+
+def land_evac_orders(city: dict) -> list[Observation]:
+    """SIMULATED evacuation order flags from the city pack (``land.demo_evac_orders``) for a calm-day demo.
+
+    Own source name (``demo_land``), ``extra.simulated``, SIMULATED headline; never mixed with the county layer.
+    """
+    from core.schema import Place, utcnow_iso
+    hoods = {n["id"]: n for n in city.get("neighborhoods", [])}
+    out = []
+    for d in (city.get("land") or {}).get("demo_evac_orders") or []:
+        n = hoods.get(d.get("neighborhood"))
+        if not n:
+            continue
+        zone = d.get("zone", "A")
+        out.append(Observation(
+            force="land", source="demo_land",
+            place=Place(id=f"sim-evac-{n['id']}", name=f"SIMULATED evacuation order: {n['name']}", lat=n["lat"], lon=n["lon"]),
+            time=utcnow_iso(), measurement="hurricane_evacuation_zone", value=zone, unit="zone",
+            threshold="evacuation order in effect", status="watch",
+            extra={"neighborhood": n["id"], "evac_order_flag": True, "simulated": True,
+                   "headline": f"SIMULATED: evacuation order for zone {zone} ({n['name']}) - demo only",
+                   "note": "Demo only (DEMO_MODE=1). Not a real order; real flags come from the county layer."},
+        ))
+    return out

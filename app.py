@@ -135,6 +135,7 @@ def refresh():
                     S.obs[mod.NAME] = res
         with S.lock:  # simulated hotspots live under their own key, never inside nasa_firms
             S.obs["demo_fire"] = demo_mode.fire_hotspots(S.city) if demo_mode.enabled() else []
+            S.obs["demo_land"] = demo_mode.land_evac_orders(S.city) if demo_mode.enabled() else []
             # simulated AQI sensors only when no real AQI feed is live (no AirNow / PurpleAir key)
             real_aqi = any(S.adapter_status.get(n, {}).get("ok") for n in ("airnow", "purpleair"))
             S.obs["demo_air"] = demo_mode.air_sensors(S.city) if demo_mode.enabled() and not real_aqi else []
@@ -158,6 +159,10 @@ def refresh():
             if t["forces"]["fire"]["status"] in ("watch", "alert") and ctx.get("cooling_centers"):
                 cc = ctx["cooling_centers"][0]
                 facts.append(f"Nearest cooling center: {cc['name']} ({cc['km']} km)")
+            lc = t["forces"]["land"].get("context") or {}
+            if t["forces"]["land"]["status"] in ("watch", "alert") and lc.get("nearest_shelter"):
+                sh = lc["nearest_shelter"]
+                facts.append(f"Nearest open shelter: {sh['name']} ({sh['km']} km)")
             aq = (t["forces"]["air"].get("context") or {}).get("aqi") or {}
             tips = {"air": "air_quality" if aq.get("status") in ("watch", "alert") else "storm"}
             if aq.get("status") in ("watch", "alert"):

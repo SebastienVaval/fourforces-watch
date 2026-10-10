@@ -2,7 +2,7 @@
 
 Open items only. Finished work is recorded in [DELIVERY.md](DELIVERY.md). Order and timing are in [PLAN.md](PLAN.md).
 
-_Last updated: Sat Oct 10, 2026, 3:20 PM ET._
+_Last updated: Sat Oct 10, 2026, 3:30 PM ET._
 
 ## Now: before the 4:00 PM ET shortlist (hard deadline 4:30 PM)
 
@@ -36,6 +36,7 @@ on `dev_seb` and waits to be merged into `dev`. Enrique works on `dev_enrique` a
 - [x] Miami-Dade County Open Data layers + overlays and Mapbox basemap (DELIVERY rows 28–30), on `dev_seb`.
 - [ ] Render: add `MAPBOX_TOKEN` (public pk. token) and `FIRMS_MAP_KEY` as secret env vars (both `sync: false` in
       `render.yaml`). Without `MAPBOX_TOKEN` the map falls back to OSM/CARTO tiles.
+- [ ] Demo: on the Hazard Board, show the land tile (evacuation zone, nearest shelter / bus pickup) and the SIMULATED evacuation order on Miami Beach (`DEMO_MODE=1`).
 - [ ] Demo: open the map's layer control (top left) and show the evacuation zones + FEMA VE overlays with a camera.
 - [x] Fire force (M0.9, DELIVERY rows 31–34) on `dev_seb`: FIRMS 4 sensors, hotspot rule, nearest station/cooling, Fire view, SIMULATED hotspot.
 - [x] Water force (M0.11, DELIVERY rows 39–41) on `dev_seb`.

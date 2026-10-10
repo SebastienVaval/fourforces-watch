@@ -1,4 +1,7 @@
-"""USGS earthquake catalog (earthquake.usgs.gov FDSN). No key. Generic; rarely fires in Florida."""
+"""USGS earthquake catalog (earthquake.usgs.gov FDSN, bbox query). No key. Generic; rarely fires in Florida.
+
+Each event is a point (``extra.kind = earthquake``); forces/land.py turns distance + magnitude into a tile status.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -23,6 +26,10 @@ def fetch(city: dict) -> list[Observation]:
                                "minlongitude": b["west"] - pad, "maxlongitude": b["east"] + pad})
         r.raise_for_status()
         feats = r.json().get("features", [])
+    return parse_geojson(feats)
+
+
+def parse_geojson(feats: list[dict]) -> list[Observation]:
     out = []
     for f in feats:
         p = f["properties"]
@@ -33,6 +40,7 @@ def fetch(city: dict) -> list[Observation]:
             time=datetime.fromtimestamp(p["time"] / 1000, timezone.utc).isoformat().replace("+00:00", "Z"),
             measurement="earthquake_magnitude", value=mag, unit="M", threshold=4.5,
             status="alert" if mag >= 4.5 else "watch",
-            extra={"scope": "area", "zones": [], "headline": p.get("title"), "link": p.get("url")},
+            extra={"kind": "earthquake", "depth_km": (f["geometry"]["coordinates"] + [None, None, None])[2],
+                   "headline": p.get("title"), "link": p.get("url")},
         ))
     return out

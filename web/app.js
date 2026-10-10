@@ -359,6 +359,14 @@ function fireCtx(c) {
     ${c.nearest_hotspot ? `<div>Nearest hotspot: ${c.nearest_hotspot.km} km${c.nearest_hotspot.simulated ? ' <span class="sim">SIMULATED</span>' : ''}</div>` : ''}</div>`;
 }
 
+function landCtx(c) {
+  if (!c || (!c.evac_zone && !c.nearest_shelter && !c.nearest_bus_pickup)) return '';
+  const z = c.evac_zone;
+  return `<div class="landctx">${z ? `<div>Evacuation zone <b>${esc(z.zone)}</b>${z.order_flag ? ' · order flagged (confirm with official channels)' : ''}${z.simulated ? ' <span class="sim">SIMULATED</span>' : ''}</div>` : ''}
+    ${c.nearest_shelter ? `<div>Open shelter: <b>${esc(c.nearest_shelter.name)}</b> ${c.nearest_shelter.km} km</div>` : ''}
+    ${c.nearest_bus_pickup ? `<div>Evac bus pickup: <b>${esc(c.nearest_bus_pickup.name)}</b> ${c.nearest_bus_pickup.km} km</div>` : ''}</div>`;
+}
+
 function renderBoard() {
   if (!BOARD) return;
   document.getElementById('tiles').innerHTML = BOARD.tiles.map(t => {
@@ -367,7 +375,7 @@ function renderBoard() {
     const reasons = Object.values(t.forces).flatMap(f => f.reasons).slice(0, 4).map(r => `<li>${esc(r)}</li>`).join('');
     return `<div class="tile ${t.status}"><h3>${esc(t.name)}<span class="small">${esc(t.zone || '')}</span></h3>
       <div class="badges">${badges}</div><div class="msg">${esc((t.message || {})[lang] || '')}</div>
-      ${reasons ? `<ul class="reasons">${reasons}</ul>` : ''}${waterCtx(t.forces.water.context)}${airCtx(t.forces.air.context)}${fireCtx(t.forces.fire.context)}<div class="small">message by: ${esc((t.message || {}).by || '')}</div></div>`;
+      ${reasons ? `<ul class="reasons">${reasons}</ul>` : ''}${waterCtx(t.forces.water.context)}${airCtx(t.forces.air.context)}${landCtx(t.forces.land.context)}${fireCtx(t.forces.fire.context)}<div class="small">message by: ${esc((t.message || {}).by || '')}</div></div>`;
   }).join('');
   const by = BOARD.tiles.map(t => (t.message || {}).by).find(b => b && b !== 'template');
   document.getElementById('msgModel').textContent = by || 'templates (no xAI key)';

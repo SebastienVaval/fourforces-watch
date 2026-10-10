@@ -47,7 +47,11 @@ air:
 
 land:
   fema: {state: FL, fips_county: "086", lookback_days: 365}
-  earthquakes: {min_magnitude: 2.5, lookback_days: 30}
+  # per-neighborhood rule (forces/land.py): >= alert_magnitude within alert_km -> alert, any within watch_km -> watch
+  earthquakes: {min_magnitude: 2.5, lookback_days: 30, watch_km: 150, alert_km: 50, alert_magnitude: 4.5}
+  # DEMO_MODE=1 only: clearly labelled SIMULATED evacuation order flag (demo/demo_mode.py)
+  demo_evac_orders:
+    - {neighborhood: miami-beach, zone: A}
   evac_zones:
     zones_layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/HurricaneEvacZone_gdb/FeatureServer/0
     orders_layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationOrder/FeatureServer/0

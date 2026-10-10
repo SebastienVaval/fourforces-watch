@@ -34,7 +34,7 @@ air:
 
 land:
   fema: {state: ST, fips_county: "000", lookback_days: 365}
-  earthquakes: {min_magnitude: 2.5, lookback_days: 30}
+  earthquakes: {min_magnitude: 2.5, lookback_days: 30, watch_km: 150, alert_km: 50, alert_magnitude: 4.5}
   # evac_zones: optional public ArcGIS FeatureServer layers (see miami.yaml)
   # county_gis:               # optional point layers from an ArcGIS Hub portal -> reference sites (never a status)
   #   - {id: shelters, name: Shelter, url: https://.../FeatureServer/0, fields: NAME,ADDRESS, label_field: NAME}
