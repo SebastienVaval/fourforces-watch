@@ -58,17 +58,6 @@ real conditions: do not present them as real.
 Return ONLY JSON, no markdown: {{"en": "...", "es": "...", "ht": "..."}} (es = Spanish, ht = Haitian Creole)."""
 
 
-# Prefix added to every message built from at least one SIMULATED fact (demo mode), in all three languages.
-DEMO_PREFIX = {"en": "[SIMULATED demo] ", "es": "[Demo SIMULADA] ", "ht": "[Demo SIMILE] "}
-
-
-def _label_simulated(msg: dict, facts: list[str]) -> dict:
-    if not any("SIMULATED" in str(f) for f in facts):
-        return msg
-    return msg | {k: (msg[k] if msg[k].startswith(DEMO_PREFIX[k]) else DEMO_PREFIX[k] + msg[k]) for k in DEMO_PREFIX} \
-        | {"simulated": True}
-
-
 def _template(name, overall, statuses, tips=None):
     out = {}
     for lang in ("en", "es", "ht"):
@@ -99,7 +88,7 @@ def neighborhood_message(city_name: str, name: str, overall: str, statuses: dict
         except Exception as e:
             log.warning("grok message failed for %s: %s", name, e)
     if msg is None:
-        msg = _label_simulated(_template(name, overall, statuses, tips) | {"by": "template"}, facts)
+        msg = _template(name, overall, statuses, tips) | {"by": "template"}
         if have_ai:
             return msg  # don't cache the fallback; retry Grok next refresh
     _cache[key] = msg

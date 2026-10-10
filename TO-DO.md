@@ -2,7 +2,7 @@
 
 Open items only. Finished work is recorded in [DELIVERY.md](DELIVERY.md). Order and timing are in [PLAN.md](PLAN.md).
 
-_Last updated: Sat Oct 10, 2026, 3:20 PM ET._
+_Last updated: Sat Oct 10, 2026, 2:40 PM ET._
 
 ## Now: before the 4:00 PM ET shortlist (hard deadline 4:30 PM)
 
@@ -38,9 +38,6 @@ on `dev_seb` and waits to be merged into `dev`. Enrique works on `dev_enrique` a
       `render.yaml`). Without `MAPBOX_TOKEN` the map falls back to OSM/CARTO tiles.
 - [ ] Demo: open the map's layer control (top left) and show the evacuation zones + FEMA VE overlays with a camera.
 - [x] Fire force (M0.9, DELIVERY rows 31–34) on `dev_seb`: FIRMS 4 sensors, hotspot rule, nearest station/cooling, Fire view, SIMULATED hotspot.
-- [x] Water force (M0.11, DELIVERY rows 39–41) on `dev_seb`.
-- [ ] Water, later: official canal flood stages per USGS site (`water.usgs.site_thresholds` is empty, so only the
-      rapid-rise rule fires); optional SIMULATED tide surge for the demo.
 - [x] Air force (M0.10, DELIVERY rows 35–38) on `dev_seb`: works without keys, SIMULATED AQI sensors in demo.
 - [ ] Request `AIRNOW_API_KEY` (free, https://docs.airnowapi.org/account/request/) and a PurpleAir read key
       (`PURPLEAIR_API_KEY`, https://develop.purpleair.com/); add to `.env` and as Render secrets. No code change needed.
