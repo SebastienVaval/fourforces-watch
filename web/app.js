@@ -18,9 +18,59 @@ document.querySelectorAll('.lang').forEach(b => b.onclick = () => {
 });
 
 const map = L.map('map').setView([25.77, -80.25], 10);
-L.tileLayer('https://{s}.basemap.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  {attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 19}).addTo(map);
 const layers = Object.fromEntries(['water', 'air', 'land', 'fire'].map(f => [f, L.layerGroup().addTo(map)]));
+const refLayer = L.layerGroup().addTo(map);  // county reference sites (never change a status)
+
+// Basemap: Mapbox when the server has a public MAPBOX_TOKEN (pk.*), else free OSM/CARTO tiles.
+const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+function mapboxLayer(style, token) {
+  return L.tileLayer(`https://api.mapbox.com/styles/v1/${style}/tiles/512/{z}/{x}/{y}@2x?access_token=${encodeURIComponent(token)}`, {
+    tileSize: 512, zoomOffset: -1, maxZoom: 20,
+    attribution: '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> ' + OSM_ATTR +
+      ' <a href="https://www.mapbox.com/map-feedback/" target="_blank">Improve this map</a>'});
+}
+function overlayStyle(m) {
+  return f => {
+    const v = m.style_field ? f.properties[m.style_field] : null;
+    let color = m.color || FORCE_COLORS[m.force] || '#94a3b8';
+    if (m.styles && v != null && m.styles[v]) color = m.styles[v];
+    if (m.ramp && v != null) for (const [min, c] of m.ramp) if (Number(v) >= min) color = c;
+    return {color, weight: 1.5, fillColor: color, fillOpacity: .22, opacity: .9};
+  };
+}
+async function initMapLayers() {
+  let cfg = {};
+  try { cfg = await (await fetch('/api/config')).json(); } catch (e) { /* keep OSM fallback */ }
+  const base = {};
+  if (cfg.mapbox_token) {
+    base['Mapbox ' + cfg.mapbox_style.split('/').pop()] = mapboxLayer(cfg.mapbox_style, cfg.mapbox_token);
+    if (cfg.mapbox_style !== 'mapbox/streets-v12') base['Mapbox streets'] = mapboxLayer('mapbox/streets-v12', cfg.mapbox_token);
+    base['Mapbox satellite'] = mapboxLayer('mapbox/satellite-streets-v12', cfg.mapbox_token);
+  }
+  base['OSM / CARTO dark'] = L.tileLayer('https://{s}.basemap.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {attribution: OSM_ATTR + ' &copy; CARTO', maxZoom: 19});
+  Object.values(base)[0].addTo(map);
+  const attribution = (cfg.open_data && cfg.open_data.attribution) || '';
+  const over = {'County reference sites': refLayer};
+  let metas = [];
+  try { metas = await (await fetch('/api/overlays')).json(); } catch (e) { /* no overlays */ }
+  for (const m of metas) {
+    const lyr = L.geoJSON(null, {style: overlayStyle(m), attribution,
+      onEachFeature: (f, l) => l.bindPopup(`<div class="popup"><b>${esc(m.name)}</b><br>` +
+        Object.entries(f.properties || {}).map(([k, v]) => `${esc(k)}: <b>${esc(v)}</b>`).join('<br>') +
+        `<div class="small">${esc(attribution)}</div></div>`)});
+    lyr.on('add', async () => {
+      if (lyr._loaded) return;
+      lyr._loaded = true;
+      try { lyr.addData(await (await fetch('/api/overlays/' + encodeURIComponent(m.id))).json()); lyr.bringToBack(); }
+      catch (e) { lyr._loaded = false; }
+    });
+    over[`<span class="f ${esc(m.force)}">${esc(LABEL[m.force] || m.force)}</span> ${esc(m.name)}`] = lyr;
+    if (m.default) lyr.addTo(map);
+  }
+  L.control.layers(base, over, {collapsed: true, position: 'topleft'}).addTo(map);
+}
+initMapLayers();
 document.querySelectorAll('.layers input[data-force]').forEach(cb => cb.onchange = () =>
   cb.checked ? layers[cb.dataset.force].addTo(map) : map.removeLayer(layers[cb.dataset.force]));
 document.getElementById('onlyChecked').onchange = renderMap;
@@ -65,8 +115,16 @@ function popupFor(o) {
     <div class="small">${esc(o.source)} · ${fmt(o.time)}</div></div>`;
 }
 
+function refPopup(o) {
+  const p = o.extra.properties || {};
+  return `<div class="popup"><b>${esc(o.place.name)}</b><br>${esc(LABEL[o.force])} · ${esc(o.extra.layer_name || o.measurement)}<br>
+    ${Object.entries(p).map(([k, v]) => `<span class="small">${esc(k)}:</span> ${esc(v)}`).join('<br>')}
+    ${o.extra.link ? `<br><a href="${esc(o.extra.link)}" target="_blank" rel="noopener">info</a>` : ''}
+    <div class="small">Reference site, not a hazard reading · ${esc(o.extra.attribution || o.source)}</div></div>`;
+}
+
 function renderMap() {
-  Object.values(layers).forEach(l => l.clearLayers()); markers = {};
+  Object.values(layers).forEach(l => l.clearLayers()); refLayer.clearLayers(); markers = {};
   const onlyChecked = document.getElementById('onlyChecked').checked;
   for (const o of OBS) {
     if (o.place.lat == null || o.place.lon == null) continue;
@@ -79,6 +137,11 @@ function renderMap() {
       continue;
     }
     if (o.extra.scope === 'area' && o.source !== 'noaa_tide' && o.source !== 'nws_heat_index') continue;  // side panel
+    if (o.extra.reference) {  // county open-data reference site: small square-ish marker, info only
+      L.circleMarker([o.place.lat, o.place.lon], {radius: 4, color: '#0f172a', weight: 1,
+        fillColor: FORCE_COLORS[o.force], fillOpacity: .95}).bindPopup(refPopup(o)).addTo(refLayer);
+      continue;
+    }
     L.circleMarker([o.place.lat, o.place.lon], {radius: o.source === 'noaa_tide' ? 10 : 6, color: FORCE_COLORS[o.force],
       weight: 2, fillColor: COLORS[o.status] || COLORS.unknown, fillOpacity: .75})
       .bindPopup(popupFor(o)).addTo(layers[o.force] || layers.land);
