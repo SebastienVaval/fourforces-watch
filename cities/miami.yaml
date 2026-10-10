@@ -1,0 +1,72 @@
+# City pack: Miami-Dade County, Florida
+id: miami
+name: Miami-Dade County, FL
+timezone: America/New_York
+center: [25.77, -80.25]
+zoom: 10
+bbox: {south: 25.13, north: 25.98, west: -80.87, east: -80.11}
+
+water:
+  cameras:
+    source: fl511            # adapters/water/fl511_cameras.py
+    counties: ["Miami-Dade", "Miami Dade"]
+  noaa_tide:
+    station: "8723214"       # Virginia Key, FL
+    datum: MLLW
+    # NOAA flood levels are published in station datum (STND); MLLW = 10.13 ft STND.
+    # NWS minor 13.66 / moderate 14.06 / major 14.86 ft STND  ->  MLLW below.
+    watch_ft: 3.0
+    minor_flood_ft: 3.53
+    moderate_flood_ft: 3.93
+    major_flood_ft: 4.73
+  usgs:
+    county_cd: "12086"
+    parameter_cd: "00065"    # gauge height, ft
+    rapid_rise_ft_3h: 0.5    # generic watch rule: rise faster than this over 3 h
+    site_thresholds: {}      # optional {site_no: {watch: x, alert: y}}
+
+air:
+  airnow: {distance_miles: 25}
+  purpleair: {max_sensors: 60}
+  aqi_watch: 101
+  aqi_alert: 151
+  nhc_radius_km: 800         # storm center within 800 km -> watch
+  nhc_alert_radius_km: 300   # within 300 km -> alert
+
+land:
+  fema: {state: FL, fips_county: "086", lookback_days: 365}
+  earthquakes: {min_magnitude: 2.5, lookback_days: 30}
+  evac_zones:
+    zones_layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/HurricaneEvacZone_gdb/FeatureServer/0
+    orders_layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationOrder/FeatureServer/0
+    shelters_layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationCenterShelters_Open/FeatureServer/0
+    info_url: https://www.miamidade.gov/global/emergency/hurricane/home.page
+    # Order flags are shown as 'watch - confirm with official channels' unless true.
+    trust_orders: false
+
+fire:
+  nws_station: KMIA          # Miami International Airport
+  heat_index_watch_f: 103
+  heat_index_alert_f: 108
+  firms: {source: VIIRS_SNPP_NRT, days: 1}
+
+nws:
+  point: [25.77, -80.19]
+  zones: [FLZ073, FLZ074, FLZ173, FLZ174, FLC086]
+
+# Hazard Board tiles (approximate centroids + NWS forecast zone from api.weather.gov/zones?point=)
+neighborhoods:
+  - {id: downtown,      name: Downtown / Brickell, lat: 25.7617, lon: -80.1918, zone: FLZ173}
+  - {id: miami-beach,   name: Miami Beach,         lat: 25.7907, lon: -80.1300, zone: FLZ173}
+  - {id: little-havana, name: Little Havana,       lat: 25.7735, lon: -80.2163, zone: FLZ074}
+  - {id: little-haiti,  name: Little Haiti,        lat: 25.8303, lon: -80.1956, zone: FLZ173}
+  - {id: north-miami,   name: North Miami,         lat: 25.8901, lon: -80.1867, zone: FLZ173}
+  - {id: hialeah,       name: Hialeah,             lat: 25.8576, lon: -80.2781, zone: FLZ074}
+  - {id: doral,         name: Doral,               lat: 25.8195, lon: -80.3553, zone: FLZ074}
+  - {id: coral-gables,  name: Coral Gables,        lat: 25.7215, lon: -80.2684, zone: FLZ074}
+  - {id: key-biscayne,  name: Key Biscayne,        lat: 25.6937, lon: -80.1626, zone: FLZ173}
+  - {id: homestead,     name: Homestead,           lat: 25.4687, lon: -80.4776, zone: FLZ073}
+
+coastal_zones: [FLZ173, FLZ174]   # tide gauge readings apply to these zones
+nearby_km: 6                      # point observations within this distance count for a tile
+languages: [en, es, ht]
