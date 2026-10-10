@@ -60,3 +60,17 @@ def test_grok_response_parsing():
     assert j["water_on_road"] is True
     assert grok.status_from({"water_on_road": True, "confidence": 0.9}) == "alert"
     assert grok.status_from({"water_on_road": True, "confidence": 0.4}) == "watch"
+
+
+def test_messages_built_from_simulated_facts_are_labelled(monkeypatch):
+    from detect import grok, messages
+    st = {"water": "alert", "air": "ok", "land": "ok", "fire": "ok"}
+    monkeypatch.delenv("XAI_API_KEY", raising=False)
+    m = messages.neighborhood_message("Miami", "Brickell", "alert", st, ["SIMULATED: Water on road seen by camera X"])
+    assert m["en"].startswith("[SIMULATED demo]") and m["es"].startswith("[Demo SIMULADA]") and m["simulated"]
+    monkeypatch.setenv("XAI_API_KEY", "test")
+    monkeypatch.setattr(grok, "generate_text", lambda *a, **k: '{"en": "Water on roads.", "es": "Agua.", "ht": "Dlo."}')
+    g = messages.neighborhood_message("Miami", "Little Havana", "alert", st, ["SIMULATED: Water on road seen by camera Y"])
+    assert g["by"] != "template" and g["en"] == "[SIMULATED demo] Water on roads." and g["ht"].startswith("[Demo SIMILE]")
+    real = messages.neighborhood_message("Miami", "Doral", "alert", st, ["Flood Warning by NWS"])
+    assert not real["en"].startswith("[") and "simulated" not in real
