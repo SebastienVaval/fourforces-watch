@@ -186,7 +186,7 @@ function renderAir() {
   const box = document.getElementById('airBox');
   if (activeView !== 'air') return;
   const sens = OBS.filter(o => o.extra.kind === 'aqi_sensor'), sim = sens.filter(o => o.extra.simulated);
-  const area = OBS.filter(o => o.extra.kind === 'aqi_area');
+  const area = OBS.filter(o => o.extra.kind === 'aqi_area' || o.extra.network === 'AirNow');
   const storms = OBS.filter(o => o.source === 'nhc_storms');
   const wind = OBS.filter(o => o.force === 'air' && o.source === 'nws_wind_alerts');
   const ad = n => STATUS && STATUS.adapters[n];
@@ -194,13 +194,13 @@ function renderAir() {
   box.innerHTML = `<h4>Air view</h4>
     <div>AirNow: ${feed('airnow')} · PurpleAir: ${feed('purpleair')}</div>
     <div>AQI sensors: <b>${sens.length - sim.length}</b> real${sim.length ? ` · <span class="sim">${sim.length} SIMULATED</span>` : ''}
-      · area readings: <b>${area.length}</b></div>
+      · of which official AirNow: <b>${area.length}</b></div>
     <div>Tropical systems (NHC): <b>${storms.length}</b>${storms.map(s => `<div class="small">${esc(s.extra.headline || s.place.name)}</div>`).join('')}</div>
     <div>NWS wind / tropical / air alerts: <b>${wind.length}</b></div>
     <div class="legend">${AQI_CATS.map(([lim, c, n], i) => `<span><i class="dot" style="background:${c}"></i>${n} (${i ? AQI_CATS[i - 1][0] + 1 : 0}${lim < 1e9 ? '–' + lim : '+'})</span>`).join('')}
       <span><i class="dot" style="background:#f97316;outline:2px dashed #fde047"></i>SIMULATED</span>
       <span><i class="dot" style="background:#64748b;outline:2px solid #e879f9"></i>storm center</span></div>
-    <div class="small">Board rule: tile AQI = median of sensors within 5 km, else AirNow area AQI. AQI ≥ 101 = watch, ≥ 151 = alert
+    <div class="small">Board rule: tile AQI = median of monitors/sensors within 5 km (worst pollutant each), else the worst AirNow reading city-wide. AQI ≥ 101 = watch, ≥ 151 = alert
       (EPA 2024 PM2.5 breakpoints; PurpleAir EPA-corrected). Storm within 800 km = watch, 300 km = alert.</div>`;
 }
 

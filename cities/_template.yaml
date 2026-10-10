@@ -23,7 +23,7 @@ water:
     site_thresholds: {}
 
 air:
-  airnow: {distance_miles: 25}
+  airnow: {parameters: "PM25,OZONE,PM10", hours: 3}   # optional bbox: {...}; defaults to the city bbox
   purpleair: {max_sensors: 60}
   aqi_watch: 101
   aqi_alert: 151

@@ -9,14 +9,15 @@ from demo import demo_mode
 from forces import air
 from forces.engine import board
 
-AIRNOW_ROWS = [
-    {"DateObserved": "2026-10-10 ", "HourObserved": 13, "LocalTimeZone": "EST", "ReportingArea": "Miami",
-     "StateCode": "FL", "Latitude": 25.78, "Longitude": -80.21, "ParameterName": "O3", "AQI": 42,
-     "Category": {"Number": 1, "Name": "Good"}},
-    {"DateObserved": "2026-10-10 ", "HourObserved": 13, "LocalTimeZone": "EST", "ReportingArea": "Miami",
-     "StateCode": "FL", "Latitude": 25.78, "Longitude": -80.21, "ParameterName": "PM2.5", "AQI": 112,
-     "Category": {"Number": 3, "Name": "Unhealthy for Sensitive Groups"}},
-    {"ParameterName": "PM10", "AQI": -1},
+AIRNOW_ROWS = [  # /aq/data/ verbose=1 shape
+    {"Latitude": 25.686942, "Longitude": -80.399988, "UTC": "2026-10-10T16:00", "Parameter": "PM2.5", "Unit": "UG/M3",
+     "AQI": 30, "Category": 1, "SiteName": "Kendall", "FullAQSCode": "120860034"},
+    {"Latitude": 25.686942, "Longitude": -80.399988, "UTC": "2026-10-10T17:00", "Parameter": "PM2.5", "Unit": "UG/M3",
+     "AQI": 112, "Category": 3, "SiteName": "Kendall", "FullAQSCode": "120860034"},
+    {"Latitude": 25.7325, "Longitude": -80.162201, "UTC": "2026-10-10T17:00", "Parameter": "OZONE", "Unit": "PPB",
+     "AQI": 24, "Category": 1, "SiteName": "Rosenstiel", "FullAQSCode": "120860027"},
+    {"Latitude": 25.7325, "Longitude": -80.162201, "UTC": "2026-10-10T17:00", "Parameter": "PM10", "Unit": "UG/M3",
+     "AQI": -999, "Category": 0, "SiteName": "Rosenstiel", "FullAQSCode": "120860027"},
 ]
 PA_JSON = {"api_version": "V1.0.11", "fields": ["sensor_index", "name", "latitude", "longitude", "pm2.5_10minute",
                                                 "pm2.5_cf_1", "humidity", "last_seen", "confidence"],
@@ -51,14 +52,33 @@ def test_airnow_parse_and_fetch(monkeypatch):
     _mock(monkeypatch, airnow, AIRNOW_ROWS, seen=seen)
     obs = airnow.fetch(load_city("miami"))
     q = seen[0].url.params
-    assert seen[0].url.path == "/aq/observation/latLong/current/" and q["API_KEY"] == "test-key" and q["distance"] == "25"
-    assert [o.value for o in obs] == [42, 112]  # negative AQI dropped
-    pm = obs[1]
-    assert pm.status == "watch" and pm.extra["kind"] == "aqi_area" and pm.extra["scope"] == "area"
-    assert pm.time == "2026-10-10T18:00:00Z"
-    _mock(monkeypatch, airnow, {"WebServiceError": [{"Message": "Invalid API key"}]}, status=401)
+    assert seen[0].url.path == "/aq/data/" and q["API_KEY"] == "test-key" and q["dataType"] == "A"
+    assert q["BBOX"] == "-80.87,25.13,-80.11,25.98" and "PM25" in q["parameters"] and "OZONE" in q["parameters"]
+    assert len(q["startDate"]) == 13 and q["startDate"] < q["endDate"]  # YYYY-MM-DDTHH, UTC
+    assert [(o.extra["site"], o.extra["parameter"], o.value) for o in obs] == [
+        ("Rosenstiel", "OZONE", 24), ("Kendall", "PM2.5", 112)]  # latest hour kept, negative AQI dropped
+    k = obs[1]
+    assert k.status == "watch" and k.extra["kind"] == "aqi_sensor" and k.extra["network"] == "AirNow"
+    assert k.time == "2026-10-10T17:00:00Z" and k.place.lat == 25.686942
+
+
+def test_airnow_web_service_error(monkeypatch):
+    monkeypatch.setenv("AIRNOW_API_KEY", "test-key")
+    retired = {"WebServiceError": [{"Message": "This web service has been retired as of October 1, 2026."}]}
+    _mock(monkeypatch, airnow, retired)
+    with pytest.raises(RuntimeError, match="retired"):
+        airnow.fetch(load_city("miami"))
+    _mock(monkeypatch, airnow, {"WebServiceError": [{"Message": "Invalid API key"}]})
+    with pytest.raises(SkipAdapter, match="Invalid API key"):
+        airnow.fetch(load_city("miami"))
+    _mock(monkeypatch, airnow, {}, status=401)
     with pytest.raises(SkipAdapter):
         airnow.fetch(load_city("miami"))
+
+
+def test_airnow_window_format():
+    from datetime import datetime, timezone
+    assert airnow.window(datetime(2026, 10, 10, 18, 37, tzinfo=timezone.utc), 3) == ("2026-10-10T15", "2026-10-10T18")
 
 
 def test_purpleair_parse_and_fetch(monkeypatch):
@@ -82,15 +102,18 @@ def test_purpleair_parse_and_fetch(monkeypatch):
 
 def test_tile_rule_median_then_airnow():
     city = load_city("miami")
-    sensors = purpleair.parse(PA_JSON, city["air"])          # Doral: corrected ~31 ug/m3, and 12 ug/m3
-    area = airnow.parse(AIRNOW_ROWS, city["air"])             # area worst = 112 (USG)
-    tiles = {t["id"]: t for t in board(sensors + area, city)}
+    sensors = purpleair.parse(PA_JSON, city["air"])          # Doral: two PurpleAir sensors
+    official = airnow.parse(AIRNOW_ROWS, city["air"])         # Kendall PM2.5 112 (USG), Rosenstiel O3 24
+    tiles = {t["id"]: t for t in board(sensors + official, city)}
     d = tiles["doral"]["forces"]["air"]
     assert d["context"]["aqi"]["source"].startswith("median of 2")
     assert d["context"]["aqi"]["aqi"] == round((sensors[0].value + sensors[1].value) / 2)
-    hb = tiles["miami-beach"]["forces"]["air"]                # no sensor near -> AirNow area AQI
+    assert d["status"] == "ok"                                # sensors near Doral override the city-wide value
+    kb = tiles["key-biscayne"]["forces"]["air"]               # Rosenstiel monitor ~4.3 km away
+    assert kb["context"]["aqi"]["aqi"] == 24 and "AirNow" in kb["context"]["aqi"]["source"]
+    hb = tiles["miami-beach"]["forces"]["air"]                # nothing within 5 km -> worst AirNow monitor
     assert hb["context"]["aqi"]["aqi"] == 112 and hb["status"] == "watch"
-    assert tiles["doral"]["forces"]["air"]["status"] == "ok"  # sensors near Doral override the area value
+    assert hb["context"]["aqi"]["source"].startswith("AirNow area, worst monitor: Kendall")
 
 
 def test_demo_air_sensors_labelled_and_separate():

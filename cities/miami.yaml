@@ -26,7 +26,7 @@ water:
     site_thresholds: {}      # optional {site_no: {watch: x, alert: y}}
 
 air:
-  airnow: {distance_miles: 25}          # AirNow reporting area around the city center
+  airnow: {parameters: "PM25,OZONE,PM10", hours: 3}   # /aq/data/ monitors in bbox, latest hour each
   purpleair: {max_sensors: 60, max_age_s: 3600, min_confidence: 50}   # outdoor sensors in bbox
   aqi_watch: 101             # EPA "Unhealthy for Sensitive Groups"
   aqi_alert: 151             # EPA "Unhealthy"
