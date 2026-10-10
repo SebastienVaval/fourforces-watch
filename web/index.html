@@ -32,10 +32,13 @@
         <label><input type="checkbox" id="showRefs" checked> county sites</label>
         <button id="waterViewBtn" class="fireview waterview" title="Show only water layers">🌊 Water view</button>
         <button id="airViewBtn" class="fireview airview" title="Show only air layers">💨 Air view</button>
+        <button id="landViewBtn" class="fireview landview" title="Show only land layers">⛰ Land view</button>
         <button id="fireViewBtn" class="fireview" title="Show only fire layers">🔥 Fire view</button>
+        <button id="allViewBtn" class="fireview allview" title="Show all four forces">◎ All</button>
       </div>
       <div id="waterBox" class="card hidden"></div>
       <div id="airBox" class="card hidden"></div>
+      <div id="landBox" class="card hidden"></div>
       <div id="fireBox" class="card hidden"></div>
       <div id="tideBox" class="card"></div>
       <div id="camSummary" class="card"></div>
@@ -51,6 +54,12 @@
     <div class="board-head">
       <div>Neighborhood status from public sensors and official alerts. Messages written by <b id="msgModel">Grok</b>.</div>
       <div class="langs"><button class="lang active" data-lang="en">English</button><button class="lang" data-lang="es">Español</button><button class="lang" data-lang="ht">Kreyòl</button></div>
+    </div>
+    <div class="board-meta">
+      <div id="boardLegend" class="legend"><span><i class="dot ok"></i>ok</span><span><i class="dot watch"></i>watch</span><span><i class="dot alert"></i>alert</span><span><i class="dot grey"></i>unknown / no data</span>
+        <span class="small">chips: 💧 Water · 🌬 Air · ⛰ Land · 🔥 Fire · overall = worst of the four</span></div>
+      <div class="small">Last updated: <b id="boardUpdated">—</b></div>
+      <div id="boardSources" class="small"></div>
     </div>
     <div id="tiles"></div>
     <p class="small">Not an official warning system. Always follow the National Weather Service and county emergency management.</p>

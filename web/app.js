@@ -83,7 +83,9 @@ const FIRE_OVERLAY = 'mdc_heat_islands';
 let savedChecks = null, savedOverlays = [];
 const VIEWS = {fire: {forces: ['fire'], overlays: [FIRE_OVERLAY], box: 'fireBox', btn: 'fireViewBtn'},
                air: {forces: ['air'], overlays: [], box: 'airBox', btn: 'airViewBtn'},
-               water: {forces: ['water'], overlays: ['mdc_fema_ve', 'mdc_canals'], box: 'waterBox', btn: 'waterViewBtn'}};
+               water: {forces: ['water'], overlays: ['mdc_fema_ve', 'mdc_canals'], box: 'waterBox', btn: 'waterViewBtn'},
+               land: {forces: ['land'], overlays: ['mdc_surge_zones', 'mdc_evac_routes'], box: 'landBox', btn: 'landViewBtn'}};
+const ICON = {water: '💧', air: '🌬', land: '⛰', fire: '🔥'};
 let activeView = null;
 function setView(name) {
   const boxes = [...document.querySelectorAll('.layers input[data-force]')];
@@ -107,11 +109,13 @@ function setView(name) {
     document.getElementById(v.btn).classList.add('active');
     document.getElementById(v.box).classList.remove('hidden');
   }
-  renderMap(); renderFire(); renderAir(); renderWater();
+  renderMap(); renderFire(); renderAir(); renderWater(); renderLand();
 }
 document.getElementById('fireViewBtn').onclick = () => setView('fire');
 document.getElementById('airViewBtn').onclick = () => setView('air');
 document.getElementById('waterViewBtn').onclick = () => setView('water');
+document.getElementById('landViewBtn').onclick = () => setView('land');
+document.getElementById('allViewBtn').onclick = () => { if (activeView) setView(activeView); };  // leave any view: all forces
 
 const tide = () => OBS.find(o => o.source === 'noaa_tide');
 
@@ -231,6 +235,42 @@ function renderAir() {
       <span><i class="dot" style="background:#64748b;outline:2px solid #e879f9"></i>storm center</span></div>
     <div class="small">Board rule: tile AQI = median of monitors/sensors within 5 km (worst pollutant each), else the worst AirNow reading city-wide. AQI ≥ 101 = watch, ≥ 151 = alert
       (EPA 2024 PM2.5 breakpoints; PurpleAir EPA-corrected). Storm within 800 km = watch, 300 km = alert.</div>`;
+}
+
+function renderLand() {
+  const box = document.getElementById('landBox');
+  if (activeView !== 'land') return;
+  const zones = OBS.filter(o => o.measurement === 'hurricane_evacuation_zone');
+  const flagged = zones.filter(o => o.extra.evac_order_flag), sim = flagged.filter(o => o.extra.simulated);
+  const shelters = OBS.filter(o => o.source === 'evac_shelters');
+  const quakes = OBS.filter(o => o.extra.kind === 'earthquake');
+  const fema = OBS.filter(o => o.source === 'openfema_declarations');
+  const nws = OBS.filter(o => o.force === 'land' && o.source.startsWith('nws_'));
+  const nRef = id => OBS.filter(o => o.extra.layer === id).length;
+  box.innerHTML = `<h4>Land view</h4>
+    <div>Evacuation order flags: <b>${flagged.length - sim.length}</b> real${sim.length ? ` · <span class="sim">${sim.length} SIMULATED</span>` : ''}
+      <span class="small">(county layer; confirm with official channels)</span></div>
+    <div>Open shelters: <b>${shelters.length}</b> · evacuation bus pickups: <b>${nRef('mdc_evac_bus_pickup')}</b> · hospitals: <b>${nRef('mdc_hospitals')}</b></div>
+    <div>FEMA declarations (365 d): <b>${fema.length}</b>${fema.map(f => `<div class="small">${esc(f.extra.headline || '')}</div>`).join('')}</div>
+    <div>Earthquakes (USGS, 30 d): <b>${quakes.length}</b>${quakes.slice(0, 3).map(q => `<div class="small">${esc(q.extra.headline || '')}</div>`).join('')}</div>
+    <div>NWS evacuation / civil emergency alerts: <b>${nws.length}</b></div>
+    <div class="legend"><span><i class="dot" style="background:#dc2626"></i>surge zone A</span><span><i class="dot" style="background:#f97316"></i>B</span>
+      <span><i class="dot" style="background:#facc15"></i>C</span><span><i class="dot" style="background:#22c55e"></i>D</span><span><i class="dot" style="background:#3b82f6"></i>E</span>
+      <span><i class="dot" style="background:#e879f9"></i>evacuation route</span><span><i class="dot" style="background:${REF_COLORS.mdc_evac_bus_pickup}"></i>bus pickup</span>
+      <span><i class="dot" style="background:${REF_COLORS.mdc_hospitals}"></i>hospital</span></div>
+    <div class="small">Board rule: county evacuation order flag = watch (confirm with official channels); open FEMA declaration = watch county-wide;
+      earthquake ≥ M4.5 within 50 km = alert, any within 150 km = watch. Shelters, pickups and hospitals are information only.
+      Sources: Miami-Dade County Open Data, OpenFEMA, USGS, NWS.</div>`;
+}
+
+function renderBoardMeta() {
+  if (!STATUS) return;
+  document.getElementById('boardUpdated').textContent = fmt(STATUS.last_refresh);
+  const by = {};
+  Object.values(STATUS.adapters || {}).forEach(a => (by[a.force] = by[a.force] || []).push(
+    `${esc(a.name)}${a.ok ? '' : ' <i>(' + esc(a.skipped ? needsKey(a.skipped) || 'off' : 'error') + ')</i>'}`));
+  document.getElementById('boardSources').innerHTML = ['water', 'air', 'land', 'fire'].map(f =>
+    `<div class="srcline">${ICON[f]} <b>${LABEL[f]}</b>: ${(by[f] || []).join(', ') || '—'}</div>`).join('');
 }
 
 function renderFire() {
@@ -371,7 +411,8 @@ function renderBoard() {
   if (!BOARD) return;
   document.getElementById('tiles').innerHTML = BOARD.tiles.map(t => {
     const badges = ['water', 'air', 'land', 'fire'].map(f =>
-      `<div class="badge ${t.forces[f].status}">${LABEL[f]}<small>${t.forces[f].status}</small></div>`).join('');
+      `<div class="badge chip-${f} ${t.forces[f].status}" title="${esc((t.forces[f].sources || []).join(', '))}">${ICON[f]} ${LABEL[f]}<small>${t.forces[f].status}</small></div>`).join('')
+      + `<div class="badge overall ${t.status}">Overall<small>${t.status}</small></div>`;
     const reasons = Object.values(t.forces).flatMap(f => f.reasons).slice(0, 4).map(r => `<li>${esc(r)}</li>`).join('');
     return `<div class="tile ${t.status}"><h3>${esc(t.name)}<span class="small">${esc(t.zone || '')}</span></h3>
       <div class="badges">${badges}</div><div class="msg">${esc((t.message || {})[lang] || '')}</div>
@@ -406,7 +447,7 @@ async function load() {
   document.getElementById('bannerAqi').classList.toggle('hidden', !o.some(x => x.source === 'demo_air'));
   document.getElementById('lastRefresh').textContent = s.last_refresh ? 'updated ' + fmt(s.last_refresh) : 'first refresh running…';
   if (first && s.city.center) map.setView(s.city.center, s.city.zoom || 10);
-  renderMap(); renderSide(); renderBoard(); renderFeeds(); renderFire(); renderAir(); renderWater();
+  renderMap(); renderSide(); renderBoard(); renderBoardMeta(); renderFeeds(); renderFire(); renderAir(); renderWater(); renderLand();
   if (!s.last_refresh) setTimeout(load, 4000);
 }
 document.getElementById('refreshBtn').onclick = async () => {
