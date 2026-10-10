@@ -1,0 +1,16 @@
+# Dry-day demo images: photos of real Miami street flooding from Wikimedia Commons.
+# Author of all files below: Wikimedia Commons user B137. License: CC0 1.0 (public domain dedication).
+# Downloaded at runtime (not committed) and shown ONLY when DEMO_MODE=1, always labelled SIMULATED.
+images:
+  - title: "Miami tidal flooding Oct 14 2016 09.jpg"
+    license: CC0 1.0
+  - title: "Miami tidal flooding with rain at high tide during king tides 02.jpg"
+    license: CC0 1.0
+  - title: "Miami tidal flooding with rain at high tide during king tides 26.jpg"
+    license: CC0 1.0
+  - title: "Miami tidal flooding Oct 14 2016 15 - Omni MM station 14 Street.jpg"
+    license: CC0 1.0
+  - title: "Miami tidal flooding Oct 14 2016 11 Brickell.jpg"
+    license: CC0 1.0
+# The camera nearest each of these neighborhoods gets a simulated image
+neighborhoods: [downtown, miami-beach, little-haiti, north-miami, key-biscayne]
