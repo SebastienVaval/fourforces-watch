@@ -407,6 +407,15 @@ function landCtx(c) {
     ${c.nearest_bus_pickup ? `<div>Evac bus pickup: <b>${esc(c.nearest_bus_pickup.name)}</b> ${c.nearest_bus_pickup.km} km</div>` : ''}</div>`;
 }
 
+// Who wrote the messages: Grok's model name, or why templates are showing (server sends message_label).
+function msgLabel(board, status) {
+  if (board.message_label) return board.message_label;
+  const by = board.tiles.map(t => (t.message || {}).by).find(b => b && b !== 'template');
+  if (by) return by;
+  if (!(status && status.ai && status.ai.key_present)) return 'templates (no xAI key)';
+  return board.ai_pending === false ? 'templates (Grok unavailable)' : 'templates (Grok messages loading…)';
+}
+
 function renderBoard() {
   if (!BOARD) return;
   document.getElementById('tiles').innerHTML = BOARD.tiles.map(t => {
@@ -418,8 +427,7 @@ function renderBoard() {
       <div class="badges">${badges}</div><div class="msg">${esc((t.message || {})[lang] || '')}</div>
       ${reasons ? `<ul class="reasons">${reasons}</ul>` : ''}${waterCtx(t.forces.water.context)}${airCtx(t.forces.air.context)}${landCtx(t.forces.land.context)}${fireCtx(t.forces.fire.context)}<div class="small">message by: ${esc((t.message || {}).by || '')}</div></div>`;
   }).join('');
-  const by = BOARD.tiles.map(t => (t.message || {}).by).find(b => b && b !== 'template');
-  document.getElementById('msgModel').textContent = by || 'templates (no xAI key)';
+  document.getElementById('msgModel').textContent = msgLabel(BOARD, STATUS);
 }
 
 const needsKey = msg => { const m = /([A-Z][A-Z0-9_]*_(?:KEY|TOKEN))/.exec(msg || ''); return m ? 'needs ' + m[1] : null; };
@@ -449,6 +457,7 @@ async function load() {
   if (first && s.city.center) map.setView(s.city.center, s.city.zoom || 10);
   renderMap(); renderSide(); renderBoard(); renderBoardMeta(); renderFeeds(); renderFire(); renderAir(); renderWater(); renderLand();
   if (!s.last_refresh) setTimeout(load, 4000);
+  else if (b.ai_pending) setTimeout(load, 15000);  // Grok messages / camera checks still landing
 }
 document.getElementById('refreshBtn').onclick = async () => {
   await fetch('/api/refresh', {method: 'POST'});
