@@ -190,7 +190,7 @@ function renderWater() {
   const cams = OBS.filter(o => o.source === 'fl511_cameras'), n = st => cams.filter(c => c.status === st).length;
   const sim = cams.filter(c => c.extra.simulated).length;
   const g = OBS.filter(o => o.source === 'usgs_gauges'), gw = g.filter(o => o.status !== 'ok');
-  const t = tide(), al = OBS.filter(o => o.source === 'nws_flood_alerts');
+  const t = tide(), al = OBS.filter(o => o.force === 'water' && o.source.startsWith('nws_'));
   const nh = t && t.extra.next_high;
   box.innerHTML = `<h4>Water view</h4>
     ${t ? `<div>Tide (NOAA ${esc(t.place.id.replace('noaa-', ''))}): <b>${t.value.toFixed(2)} ft</b> MLLW <span class="st ${t.status}">${esc(t.status)}</span>
@@ -217,7 +217,7 @@ function renderAir() {
   const sens = OBS.filter(o => o.extra.kind === 'aqi_sensor'), sim = sens.filter(o => o.extra.simulated);
   const area = OBS.filter(o => o.extra.kind === 'aqi_area' || o.extra.network === 'AirNow');
   const storms = OBS.filter(o => o.source === 'nhc_storms');
-  const wind = OBS.filter(o => o.force === 'air' && o.source === 'nws_wind_alerts');
+  const wind = OBS.filter(o => o.force === 'air' && o.source.startsWith('nws_'));
   const ad = n => STATUS && STATUS.adapters[n];
   const feed = n => { const a = ad(n); return a ? (a.ok ? `<span class="pill ok">live</span> ${a.count}` : `<span class="pill skip">${esc(needsKey(a.skipped) || 'off')}</span>`) : '—'; };
   box.innerHTML = `<h4>Air view</h4>
@@ -238,7 +238,7 @@ function renderFire() {
   if (activeView !== 'fire') return;
   const hs = OBS.filter(o => o.extra.kind === 'hotspot'), real = hs.filter(o => !o.extra.simulated);
   const hi = OBS.find(o => o.measurement === 'heat_index_observed'), hf = OBS.find(o => o.measurement === 'heat_index_forecast_max_12h');
-  const alerts = OBS.filter(o => o.force === 'fire' && o.source === 'nws_heat_fire_alerts');
+  const alerts = OBS.filter(o => o.force === 'fire' && o.source.startsWith('nws_') && o.source !== 'nws_heat_index');
   const nRef = id => OBS.filter(o => o.extra.layer === id).length;
   const firms = STATUS && STATUS.adapters.nasa_firms;
   box.innerHTML = `<h4>Fire view</h4>
