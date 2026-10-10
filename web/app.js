@@ -82,7 +82,8 @@ document.getElementById('showRefs').onchange = renderMap;
 const FIRE_OVERLAY = 'mdc_heat_islands';
 let savedChecks = null, savedOverlays = [];
 const VIEWS = {fire: {forces: ['fire'], overlays: [FIRE_OVERLAY], box: 'fireBox', btn: 'fireViewBtn'},
-               air: {forces: ['air'], overlays: [], box: 'airBox', btn: 'airViewBtn'}};
+               air: {forces: ['air'], overlays: [], box: 'airBox', btn: 'airViewBtn'},
+               water: {forces: ['water'], overlays: ['mdc_fema_ve', 'mdc_canals'], box: 'waterBox', btn: 'waterViewBtn'}};
 let activeView = null;
 function setView(name) {
   const boxes = [...document.querySelectorAll('.layers input[data-force]')];
@@ -106,10 +107,11 @@ function setView(name) {
     document.getElementById(v.btn).classList.add('active');
     document.getElementById(v.box).classList.remove('hidden');
   }
-  renderMap(); renderFire(); renderAir();
+  renderMap(); renderFire(); renderAir(); renderWater();
 }
 document.getElementById('fireViewBtn').onclick = () => setView('fire');
 document.getElementById('airViewBtn').onclick = () => setView('air');
+document.getElementById('waterViewBtn').onclick = () => setView('water');
 
 const tide = () => OBS.find(o => o.source === 'noaa_tide');
 
@@ -180,6 +182,33 @@ function aqiPopup(o) {
     ${ex.note ? `<div class="small">${esc(ex.note)}</div>` : ''}
     ${ex.link ? `<br><a href="${esc(ex.link)}" target="_blank" rel="noopener">source</a>` : ''}
     <div class="small">Not an official warning. Check airnow.gov.</div></div>`;
+}
+
+function renderWater() {
+  const box = document.getElementById('waterBox');
+  if (activeView !== 'water') return;
+  const cams = OBS.filter(o => o.source === 'fl511_cameras'), n = st => cams.filter(c => c.status === st).length;
+  const sim = cams.filter(c => c.extra.simulated).length;
+  const g = OBS.filter(o => o.source === 'usgs_gauges'), gw = g.filter(o => o.status !== 'ok');
+  const t = tide(), al = OBS.filter(o => o.source === 'nws_flood_alerts');
+  const nh = t && t.extra.next_high;
+  box.innerHTML = `<h4>Water view</h4>
+    ${t ? `<div>Tide (NOAA ${esc(t.place.id.replace('noaa-', ''))}): <b>${t.value.toFixed(2)} ft</b> MLLW <span class="st ${t.status}">${esc(t.status)}</span>
+      ${t.extra.trend ? '· ' + esc(t.extra.trend) : ''} · ${t.extra.anomaly_ft >= 0 ? '+' : ''}${t.extra.anomaly_ft} ft vs forecast</div>
+      ${nh ? `<div class="small">Next high ${fmt(nh.time)}: ${nh.predicted_ft} ft forecast, ≈ ${nh.projected_ft} ft with today's excess (minor flood ${t.threshold} ft)</div>` : ''}` : '<div class="small">Tide: no data</div>'}
+    <div>Cameras: <b>${cams.length}</b> · <span style="color:${COLORS.alert}">${n('alert')} water</span> · <span style="color:${COLORS.watch}">${n('watch')} possible</span>
+      · <span style="color:${COLORS.ok}">${n('ok')} dry</span> · ${n('unknown')} not checked${sim ? ` · <span class="sim">${sim} SIMULATED images</span>` : ''}
+      ${STATUS && !STATUS.ai.key_present ? '<div class="small">No XAI_API_KEY: cameras stay "not checked".</div>' : ''}</div>
+    <div>USGS canal gauges: <b>${g.length}</b>${gw.length ? ` · <span class="st watch">${gw.length} rising fast / above threshold</span>` : ' · none rising fast'}</div>
+    <div>NWS flood / coastal / surge alerts: <b>${al.length}</b>${al.map(a => `<div class="small">${esc(a.measurement)}</div>`).join('')}</div>
+    <div class="legend"><span><i class="dot grey"></i>camera not checked</span><span><i class="dot ok"></i>dry</span>
+      <span><i class="dot watch"></i>possible water</span><span><i class="dot alert"></i>water on road</span>
+      <span><i class="dot" style="background:#64748b;outline:2px solid #fde047"></i>SIMULATED image</span>
+      <span><i class="dot" style="background:#22c55e;outline:2px solid #38bdf8"></i>tide / USGS gauge</span>
+      <span><i class="dot" style="background:#0ea5e9;opacity:.5"></i>FEMA VE zone</span><span><i class="dot" style="background:#22d3ee"></i>canal</span></div>
+    <div class="small">Board rule: camera water on road (Grok, ≥ 60% = alert, else watch); tide ≥ ${t ? esc((t.extra.thresholds || {}).watch_ft) : 3} ft = watch,
+      ≥ minor flood = alert (coastal zones only); USGS gauge rise ≥ 0.5 ft / 3 h = watch; NWS flood alerts by zone.
+      FEMA flood zone is context only. Sources: FL511/FDOT, NOAA CO-OPS, USGS, NWS, Miami-Dade County Open Data.</div>`;
 }
 
 function renderAir() {
@@ -265,6 +294,7 @@ function renderMap() {
       continue;
     }
     if (o.extra.scope === 'area' && o.source !== 'noaa_tide' && o.source !== 'nws_heat_index') continue;  // side panel
+    if (o.extra.kind === 'flood_zone') continue;  // per-neighborhood context, shown on the board
     if (o.extra.reference) {  // county open-data reference site: small marker, info only
       if (!showRefs) continue;
       const fc = REF_COLORS[o.extra.layer] || FORCE_COLORS[o.force];
@@ -305,6 +335,15 @@ function renderSide() {
     ${a.extra.ends ? `<div class="small">until ${fmt(a.extra.ends)}</div>` : ''}</div>`).join('') : '<div class="small">None right now.</div>';
 }
 
+function waterCtx(c) {
+  if (!c || !Object.keys(c).length) return '';
+  const fz = c.flood_zone, td = c.tide, cam = c.camera, g = c.gauge;
+  return `<div class="waterctx">${fz ? `<div>FEMA flood zone <b>${esc(fz.zone)}</b> <span class="small">${esc(fz.meaning || '')}</span></div>` : ''}
+    ${td && td.applies ? `<div>Tide <b>${esc(td.ft)} ft</b> ${esc(td.trend || '')}${td.next_high ? ` · next high ${fmt(td.next_high.time)} ≈ ${esc(td.next_high.projected_ft)} ft` : ''}</div>` : ''}
+    ${cam ? `<div>Camera <b>${esc(cam.name)}</b> ${cam.km} km: <span class="st ${cam.status}">${esc(cam.verdict)}</span>${cam.simulated ? ' <span class="sim">SIMULATED</span>' : ''}</div>` : ''}
+    ${g ? `<div>Gauge <b>${esc(g.name)}</b> ${g.km} km: ${esc(g.ft)} ft (${g.rise_3h_ft >= 0 ? '+' : ''}${esc(g.rise_3h_ft)} ft / 3 h)</div>` : ''}</div>`;
+}
+
 function airCtx(c) {
   if (!c || (!c.aqi && !c.nearest_storm)) return '';
   const a = c.aqi;
@@ -328,7 +367,7 @@ function renderBoard() {
     const reasons = Object.values(t.forces).flatMap(f => f.reasons).slice(0, 4).map(r => `<li>${esc(r)}</li>`).join('');
     return `<div class="tile ${t.status}"><h3>${esc(t.name)}<span class="small">${esc(t.zone || '')}</span></h3>
       <div class="badges">${badges}</div><div class="msg">${esc((t.message || {})[lang] || '')}</div>
-      ${reasons ? `<ul class="reasons">${reasons}</ul>` : ''}${airCtx(t.forces.air.context)}${fireCtx(t.forces.fire.context)}<div class="small">message by: ${esc((t.message || {}).by || '')}</div></div>`;
+      ${reasons ? `<ul class="reasons">${reasons}</ul>` : ''}${waterCtx(t.forces.water.context)}${airCtx(t.forces.air.context)}${fireCtx(t.forces.fire.context)}<div class="small">message by: ${esc((t.message || {}).by || '')}</div></div>`;
   }).join('');
   const by = BOARD.tiles.map(t => (t.message || {}).by).find(b => b && b !== 'template');
   document.getElementById('msgModel').textContent = by || 'templates (no xAI key)';
@@ -358,7 +397,7 @@ async function load() {
   document.getElementById('demoBanner').classList.toggle('hidden', !s.demo_mode);
   document.getElementById('lastRefresh').textContent = s.last_refresh ? 'updated ' + fmt(s.last_refresh) : 'first refresh running…';
   if (first && s.city.center) map.setView(s.city.center, s.city.zoom || 10);
-  renderMap(); renderSide(); renderBoard(); renderFeeds(); renderFire(); renderAir();
+  renderMap(); renderSide(); renderBoard(); renderFeeds(); renderFire(); renderAir(); renderWater();
   if (!s.last_refresh) setTimeout(load, 4000);
 }
 document.getElementById('refreshBtn').onclick = async () => {
