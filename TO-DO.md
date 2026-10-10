@@ -2,7 +2,7 @@
 
 Open items only. Finished work is recorded in [DELIVERY.md](DELIVERY.md). Order and timing are in [PLAN.md](PLAN.md).
 
-_Last updated: Sat Oct 10, 2026, 12:50 PM ET._
+_Last updated: Sat Oct 10, 2026, 1:40 PM ET._
 
 ## Now: before the 4:00 PM ET shortlist (hard deadline 4:30 PM)
 
@@ -23,6 +23,10 @@ Branch rule: work on `dev_seb` / `dev_enrique` and merge into `dev`. `dev` is me
   - [ ] Later, if S├®bastien has a key: add `XAI_API_KEY` as a Render secret (never in the repo). Grok checks
         switch on at the next restart.
   - [ ] Fallback if Render does not work: HF Space with the header from `deploy/huggingface-space-README.md`.
+- [x] Miami-Dade County Open Data layers + overlays and Mapbox basemap (DELIVERY rows 28–30), on `dev_seb`.
+- [ ] Render: add `MAPBOX_TOKEN` (public pk. token) and `FIRMS_MAP_KEY` as secret env vars (both `sync: false` in
+      `render.yaml`). Without `MAPBOX_TOKEN` the map falls back to OSM/CARTO tiles.
+- [ ] Demo: open the map's layer control (top left) and show the evacuation zones + FEMA VE overlays with a camera.
 - [ ] **Live Grok run** (M0.2, S├®bastien): with `XAI_API_KEY` set, confirm a camera is classified and a board
       message is Grok-written. Confirm the default model ids in `.env.example` are accepted by the API.
 - [ ] Upload the 115 s demo video (unlisted YouTube or Drive) and get a shareable link (Sébastien).
@@ -42,8 +46,8 @@ Branch rule: work on `dev_seb` / `dev_enrique` and merge into `dev`. `dev` is me
       Drop it from the diagram.
 - [ ] Feature branches (`feature/*`, `docs/roadmap`, `chore/dev-pipeline`) are 3 commits behind `main`. Sync or
       delete them after the event.
-- [ ] Optional keys still unset, so three adapters skip: `AIRNOW_API_KEY`, `PURPLEAIR_API_KEY`, `FIRMS_MAP_KEY`
-      (DELIVERY rows 3 and 6, Enrique). All are free to request.
+- [ ] Optional keys still unset on deploys, so adapters skip: `AIRNOW_API_KEY`, `PURPLEAIR_API_KEY` (DELIVERY row 3).
+      `FIRMS_MAP_KEY` now exists locally (Sébastien's `.env`); add it as a Render secret too (DELIVERY row 6).
 - [ ] README says `pip install pytest` separately; either add a `requirements-dev.txt` or keep it and say so in AGENTS.md.
 
 ## Phase 1 (Oct 12ÔÇô23)

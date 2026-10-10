@@ -18,8 +18,8 @@ flowchart TB
   subgraph L0["L0 · Adapters (one per public feed → Observation)"]
     W["Water<br/>FL511 cameras · NOAA tide · USGS gauges · NWS flood alerts"]
     A["Air<br/>NHC storms · NWS wind/tropical · AirNow* · PurpleAir*"]
-    LA["Land<br/>County evac zones/shelters · OpenFEMA · USGS quakes · NWS"]
-    F["Fire<br/>NWS heat index · NWS heat/fire alerts · NASA FIRMS*"]
+    LA["Land<br/>County evac zones/shelters · evac bus pickups · hospitals · OpenFEMA · USGS quakes · NWS"]
+    F["Fire<br/>NWS heat index · NWS heat/fire alerts · NASA FIRMS* · fire stations · cooling centers"]
   end
   AI["Grok via xAI API<br/>camera flood check · EN/ES/HT messages"]
   subgraph L1["L1 · Force rules"]
@@ -29,8 +29,8 @@ flowchart TB
     C["cities/miami.yaml · cities/_template.yaml<br/>bbox · stations · zones · thresholds · neighborhoods"]
   end
   subgraph L3["L3 · Open API + dashboard"]
-    API["/api/observations · /api/geojson · /api/cap (CAP 1.2) · /api/board · /api/status"]
-    UI["Web: Map · Hazard Board · Open data · Status"]
+    API["/api/observations · /api/geojson · /api/cap (CAP 1.2) · /api/board · /api/status · /api/overlays"]
+    UI["Web: Map (Mapbox or OSM basemap) · Hazard Board · Open data · Status"]
   end
   C -. configures .-> L0
   C -. configures .-> R
@@ -63,6 +63,35 @@ flowchart TB
 | Fire | NWS station KMIA + hourly forecast | no | heat index now + 12-hour forecast peak |
 | Fire | NWS alerts | no | heat advisory / extreme heat / red flag |
 | Fire | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/) | free key | satellite active-fire detections |
+| Land | [Miami-Dade County Open Data](https://gis-mdc.opendata.arcgis.com/): [hurricane evacuation bus pickups](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Hurricane_Bus_Stops/FeatureServer/0) (129), [hospitals](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Miami_Dade_Hospitals/FeatureServer/0) (37) | no | reference sites on the map (`county_gis_land`); never change a status |
+| Fire | Miami-Dade County Open Data: [fire stations](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FireStation_gdb/FeatureServer/0) (75), [cooling centers](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Cooling_Centers/FeatureServer/0) (65) | no | reference sites on the map (`county_gis_fire`); never change a status |
+
+### Map overlays (Miami-Dade County Open Data)
+
+Polygon and line layers from the county's [ArcGIS Hub portal](https://gis-mdc.opendata.arcgis.com/), served as
+GeoJSON at `/api/overlays/<id>` (cached 6 h, simplified) and toggled in the map's layer control. URLs live in
+`cities/miami.yaml` under `open_data`; the code (`core/arcgis.py`) works for any ArcGIS Hub city. Feature counts were
+checked live on Oct 10, 2026.
+
+| Force | Overlay (`id`) | Features |
+|---|---|---|
+| Land | [Storm surge planning / evacuation zones A–E](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/StormSurgePlanningZone_Multipart/FeatureServer/0) (`mdc_surge_zones`, on by default) | 5 |
+| Land | [Primary evacuation routes](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/PrimaryEvacuationRoute_gdb/FeatureServer/0) (`mdc_evac_routes`) | 152 |
+| Water | [FEMA flood zone VE, coastal high hazard](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FEMAFloodZone_VEView/FeatureServer/0) (`mdc_fema_ve`) | 192 |
+| Water | [FEMA flood zone AE, 1% annual chance](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FEMAFloodZone_AEView/FeatureServer/0) (`mdc_fema_ae`, ~2 MB) | 1,280 |
+| Water | [Canals](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Canal_gdb/FeatureServer/0) (`mdc_canals`) | 1,357 |
+| Fire | [Urban heat island effect by census tract](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Urban_Heat_Islands/FeatureServer/0) (`mdc_heat_islands`) | 248 |
+
+The county's pre-designated shelter list and the open-shelters layer are empty outside an activation; the open
+shelters layer is already polled by `evac_zones` and appears automatically when the county opens shelters.
+
+### Basemap: Mapbox (optional)
+
+Set `MAPBOX_TOKEN` to a **public** Mapbox token (`pk.…`) and the dashboard uses Mapbox tiles (`MAPBOX_STYLE`,
+default `mapbox/dark-v11`, plus streets and satellite in the layer control). The server hands the token to the
+browser through `/api/config`; secret `sk.` tokens are refused. Without a token the map falls back to free
+OpenStreetMap / CARTO tiles, so the public repo runs with no account. Restrict the token to your deploy URL in the
+Mapbox dashboard.
 
 ### How to run
 
@@ -108,7 +137,8 @@ cameras. Nobody watches the cameras to see whether streets are actually underwat
 - **Map:**
   - **Camera colors:** grey = not checked, green = dry, amber = possible water, red = water on road.
   - **Camera popup:** live snapshot, Grok verdict, tide and active NWS flood alerts, plus a "Check now with Grok" button.
-  - **Layer toggles:** one per force.
+  - **Layer toggles:** one per force, plus a layer control (top left) for the basemap and county open-data overlays.
+  - **Reference sites:** small dots for fire stations, cooling centers, hospitals and evacuation bus pickups (info only).
 - **Hazard Board:** 10 neighborhoods × 4 force badges, the reasons, and an EN/ES/HT message.
 - **Open data:** links to every endpoint.
 - **Status:** live health of each feed (state, item count, last fetch, last success, latency, error), plus AI key/model status.
@@ -142,6 +172,8 @@ cameras. Nobody watches the cameras to see whether streets are actually underwat
 | `GET /api/geojson?force=` | GeoJSON FeatureCollection |
 | `GET /api/cap?force=` | watch/alert items as OASIS CAP 1.2 `<alert>` elements |
 | `GET /api/status` | feed health (last fetch / last success / count / error), AI status, demo flag |
+| `GET /api/overlays` · `GET /api/overlays/{id}` | county open-data overlay list · one overlay as GeoJSON |
+| `GET /api/config` | front-end config: public Mapbox token (if set), style, open-data attribution |
 | `GET /healthz` · `/docs` | liveness · OpenAPI docs |
 
 One schema for everything:
@@ -166,11 +198,13 @@ An agent skill in the [agentskills.io](https://agentskills.io) format, `skills/f
 - **FL511 camera images** © FDOT/FL511. They are **not stored or redistributed:** the browser hot-links them, and the
   server reads them in memory only for the AI check. Only the verdict and the image hash are cached.
 - **Other feeds:** the NOAA, USGS, NWS and NHC feeds are US Government works (public domain). OpenFEMA, AirNow,
-  PurpleAir, NASA FIRMS and Miami-Dade GIS apply their own terms (links above).
+  PurpleAir, NASA FIRMS and Miami-Dade County Open Data apply their own terms (links above); county layers are
+  credited as "Miami-Dade County Open Data" on the map and in popups.
 - **Demo images:** 5 photos of real Miami tidal flooding (2016) by Wikimedia Commons user **B137**, **CC0 1.0** (see
   `demo/sources.yaml`). They are fetched at runtime, never committed, used only with `DEMO_MODE=1`, and always
   labelled **SIMULATED** (banner, popup tag, `extra.simulated`).
-- **Map:** [Leaflet](https://leafletjs.com) (BSD-2); tiles © OpenStreetMap contributors © CARTO.
+- **Map:** [Leaflet](https://leafletjs.com) (BSD-2); tiles © Mapbox © OpenStreetMap contributors when `MAPBOX_TOKEN`
+  is set, otherwise © OpenStreetMap contributors © CARTO.
 
 ## Limitations
 

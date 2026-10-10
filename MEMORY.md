@@ -3,7 +3,7 @@
 Facts about this project that are easy to forget and slow to rediscover. Not a changelog (that is git) and not a
 status board (that is [DELIVERY.md](DELIVERY.md)). Plan: [PLAN.md](PLAN.md). Open items: [TO-DO.md](TO-DO.md).
 
-_Last updated: Sat Oct 10, 2026, 12:23 PM ET._
+_Last updated: Sat Oct 10, 2026, 1:40 PM ET._
 
 ## Context
 
@@ -74,3 +74,13 @@ _Last updated: Sat Oct 10, 2026, 12:23 PM ET._
   STND): watch 3.0, minor 3.53, moderate 3.93, major 4.73.
 - NWS requires a contact in the User-Agent; set `CONTACT` on any real deployment.
 - `POST /api/cameras/{id}/check` and `POST /api/refresh` have no auth or rate limit.
+- Miami-Dade County Open Data layers are hosted on `services.arcgis.com/8Pc9XBTAsYuxx9Ny` (public, no key).
+  `f=geojson` + `outSR=4326` works on every layer used. The FEMA flood-zone views have `maxRecordCount` 100, so
+  `page_size: 100` is set in the YAML and `core/arcgis.py` follows `exceededTransferLimit`. AE is ~2 MB even
+  simplified; it is off by default and lazy-loaded.
+- County shelter layers (`EvacuationCenter_gdb`, `EvacuationCenterShelters_Open`) return 0 features outside a storm
+  activation. That is expected, not a broken feed.
+- County point layers are `extra.reference = true`: shown on the map, excluded from the board by
+  `forces/base.applies_to`, so a fire station never turns a tile's fire badge from `unknown` to `ok`.
+- `MAPBOX_TOKEN` is read from env and sent to the browser via `/api/config` only if it starts with `pk.`. Never put
+  the token in a tracked file; on Render it is a `sync: false` secret.
