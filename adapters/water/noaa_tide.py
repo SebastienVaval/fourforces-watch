@@ -44,11 +44,22 @@ def fetch(city: dict) -> list[Observation]:
         latest = _get(c, station=st, product="water_level", date="latest", datum=datum)
         pred6 = _get(c, station=st, product="predictions", datum=datum, interval="6", begin_date=begin, range=2)
         hilo = _get(c, station=st, product="predictions", datum=datum, interval="hilo", begin_date=begin, range=30)
+    return [build(latest, pred6, hilo, cfg, now)]
+
+
+def build(latest: dict, pred6: dict, hilo: dict, cfg: dict, now: datetime) -> Observation:
+    """Pure function (testable offline): NOAA JSON payloads -> one tide Observation."""
+    st, datum = cfg["station"], cfg.get("datum", "MLLW")
     meta, row = latest["metadata"], latest["data"][-1]
     t_obs, value = _parse(row["t"]), float(row["v"])
     preds = [(abs((_parse(p["t"]) - t_obs).total_seconds()), float(p["v"])) for p in pred6.get("predictions", [])]
     predicted = min(preds)[1] if preds else None
     anomaly = round(value - predicted, 2) if predicted is not None else 0.0
+    p6 = sorted((_parse(p["t"]), float(p["v"])) for p in pred6.get("predictions", []))
+    later = [v for t, v in p6 if t >= t_obs + timedelta(minutes=54)]
+    trend = None
+    if predicted is not None and later:
+        trend = "rising" if later[0] > predicted + 0.02 else "falling" if later[0] < predicted - 0.02 else "slack"
     next_high = next((p for p in hilo.get("predictions", []) if p["type"] == "H" and _parse(p["t"]) > now), None)
     projected = round(float(next_high["v"]) + max(anomaly, 0.0), 2) if next_high else None
 
@@ -60,12 +71,12 @@ def fetch(city: dict) -> list[Observation]:
         status = "watch"
     level = next((n.split("_")[0] for n in ("major_flood_ft", "moderate_flood_ft", "minor_flood_ft")
                   if cfg.get(n) is not None and value >= cfg[n]), None)
-    return [Observation(
+    return Observation(
         force=FORCE, source=NAME,
         place=Place(id=f"noaa-{st}", name=f"{meta['name']} tide gauge (NOAA {st})",
                     lat=float(meta["lat"]), lon=float(meta["lon"])),
         time=_iso(t_obs), measurement="water_level", value=value, unit=f"ft {datum}", threshold=minor, status=status,
-        extra={"scope": "area", "coastal_only": True, "predicted": predicted, "anomaly_ft": anomaly,
+        extra={"scope": "area", "coastal_only": True, "predicted": predicted, "anomaly_ft": anomaly, "trend": trend,
                "flood_level": level,
                "thresholds": {k: cfg.get(k) for k in ("watch_ft", "minor_flood_ft", "moderate_flood_ft", "major_flood_ft")},
                "next_high": {"time": _iso(_parse(next_high["t"])), "predicted_ft": float(next_high["v"]),
@@ -75,4 +86,4 @@ def fetch(city: dict) -> list[Observation]:
                "headline": f"Tide {value:.2f} ft {datum} at {meta['name']}"
                            + (f" ({anomaly:+.2f} ft vs forecast)" if predicted is not None else ""),
                "link": f"https://tidesandcurrents.noaa.gov/stationhome.html?id={st}"},
-    )]
+    )
