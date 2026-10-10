@@ -54,7 +54,7 @@ flowchart TB
 | Water | [NWS alerts](https://www.weather.gov/documentation/services-web-api) | no | flood / coastal flood / storm surge |
 | Air | [NHC CurrentStorms.json](https://www.nhc.noaa.gov/CurrentStorms.json) | no | active storms + distance to city |
 | Air | NWS alerts | no | wind / tropical / tornado / air quality |
-| Air | [EPA AirNow](https://docs.airnowapi.org/) `/aq/observation/latLong/current/` | free key | official AQI per pollutant for the reporting area |
+| Air | [EPA AirNow](https://docs.airnowapi.org/) `/aq/data/` (bbox, last 3 h, `dataType=A`) | free key | official hourly AQI per monitor and pollutant (PM2.5, ozone, PM10) |
 | Air | [PurpleAir](https://api.purpleair.com/) v1 `/sensors` (outdoor, bbox) | key | neighborhood PM2.5 → AQI (US EPA correction, EPA 2024 breakpoints) |
 | Land | Miami-Dade GIS: [evacuation zones](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/HurricaneEvacZone_gdb/FeatureServer/0), [order flags](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationOrder/FeatureServer/0), [open shelters](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationCenterShelters_Open/FeatureServer/0) | no | zone per neighborhood; order flags shown as "confirm with official channels" |
 | Land | [OpenFEMA declarations](https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2) | no | active disaster declarations for the county |
@@ -87,12 +87,14 @@ shelters layer is already polled by `evac_zones` and appears automatically when 
 
 ### Air force
 
-- **AQI sources:** EPA AirNow (official, area-wide, one AQI per pollutant) and PurpleAir outdoor sensors (neighborhood
+- **AQI sources:** EPA AirNow (official regulatory monitors via `/aq/data/`, latest hour per monitor and pollutant; the old
+  `observation/latLong/current` and `zipCode/current` services were retired on Oct 1, 2026) and PurpleAir outdoor sensors (neighborhood
   scale). PurpleAir PM2.5 uses the US EPA correction `0.524 × PM2.5_cf1 − 0.0862 × RH + 5.75` when the sensor reports
   humidity, else its uncorrected 10-minute average; sensors whose A/B channels disagree (`confidence` < 50) are dropped.
   AQI uses the EPA 2024 PM2.5 breakpoints (Good ≤ 9.0 µg/m³).
 - **Neighborhood rule** (`air` in the city pack): the tile AQI is the median of sensors within `sensor_radius_km` (5);
-  with no sensor near, the AirNow area AQI (worst pollutant) applies. AQI ≥ `aqi_watch` (101, Unhealthy for Sensitive
+  each monitor counts with its worst pollutant; with no monitor or sensor near, the worst current AirNow reading in
+  the city applies. AQI ≥ `aqi_watch` (101, Unhealthy for Sensitive
   Groups) is watch, ≥ `aqi_alert` (151, Unhealthy) is alert. NHC storms (watch within 800 km, alert within 300 km) and
   NWS wind / tropical / air-quality alerts keep their own status.
 - **Hazard Board air tile:** AQI value, EPA category and source (e.g. "median of 3 PurpleAir sensors within 5 km"), and

@@ -95,12 +95,16 @@ _Last updated: Sat Oct 10, 2026, 2:40 PM ET._
 - Fire view in the dashboard turns off the non-fire overlays and restores them on exit; the heat-island overlay id is
   hard-coded as `mdc_heat_islands` in `web/app.js`.
 - Air tile AQI is computed once per board in `forces/air.annotate` (module cache `_TILE`), then used by
-  `relevant` / `status_for` / `context`. Sensors = `extra.kind == "aqi_sensor"` (PurpleAir, demo); area AQI =
-  `kind == "aqi_area"` (AirNow) and only counts for a tile with no sensor within `sensor_radius_km`.
+  `relevant` / `status_for` / `context`. Sensors = `extra.kind == "aqi_sensor"` (AirNow monitors, PurpleAir,
+  demo), worst pollutant per monitor (`extra.station_id`), median across monitors within `sensor_radius_km`. With
+  none near, the worst official AirNow reading city-wide applies (legacy `kind == "aqi_area"` rows still work).
 - PurpleAir: `X-API-Key` header, `location_type=0`, bbox `nwlng/nwlat/selng/selat`. The EPA correction needs
   `pm2.5_cf_1` + `humidity`; the 10-minute average is the fallback. A 401/403 is reported as skipped, not an error.
-- AirNow `latLong/current` returns one row per pollutant with local `DateObserved` + `HourObserved` + `LocalTimeZone`
-  (EST/EDT); `AQI = -1` means no data. 401 + "Invalid API key" for a bad key.
+- AirNow retired `/aq/observation/latLong/current/` and `zipCode/current` on Oct 1, 2026: they answer HTTP 200 with
+  `{"WebServiceError":[{"Message":"This web service has been retired..."}]}`. Use `/aq/data/` (startDate/endDate
+  `YYYY-MM-DDTHH` in UTC, `BBOX=west,south,east,north`, `parameters=PM25,OZONE,PM10`, `dataType=A`, `verbose=1` for
+  SiteName / FullAQSCode). Errors always come as a `WebServiceError` body, often with HTTP 200: the adapter raises
+  it (key messages -> skipped). Negative AQI (e.g. -999) means no data. Miami-Dade has only ~3 reporting monitors.
 - SIMULATED AQI sensors (`S.obs["demo_air"]`) are injected only when `DEMO_MODE=1` and neither `airnow` nor
   `purpleair` is live, so adding a key removes them on the next refresh.
 - Status tab pill text comes from the adapter's SkipAdapter message: any `*_KEY` / `*_TOKEN` name in it is shown as
