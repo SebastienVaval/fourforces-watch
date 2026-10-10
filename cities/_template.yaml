@@ -1,0 +1,53 @@
+# City pack template. Copy to cities/<your-city>.yaml and run with CITY=<your-city>.
+# Remove any section you don't have; its adapters are then skipped.
+id: your-city
+name: Your City, ST
+timezone: America/New_York
+center: [0.0, 0.0]            # map center [lat, lon]
+zoom: 10
+bbox: {south: 0.0, north: 0.0, west: 0.0, east: 0.0}
+
+water:
+  cameras:
+    source: fl511             # or write adapters/water/<your_511>_cameras.py
+    counties: ["Your County"]
+  noaa_tide:                  # stations: https://tidesandcurrents.noaa.gov/
+    station: "0000000"
+    datum: MLLW
+    watch_ft: 0.0
+    minor_flood_ft: 0.0       # station floodlevels.json, converted STND -> MLLW
+  usgs:
+    county_cd: "00000"        # state FIPS + county FIPS
+    parameter_cd: "00065"
+    rapid_rise_ft_3h: 0.5
+    site_thresholds: {}
+
+air:
+  airnow: {distance_miles: 25}
+  purpleair: {max_sensors: 60}
+  aqi_watch: 101
+  aqi_alert: 151
+  nhc_radius_km: 800
+  nhc_alert_radius_km: 300
+
+land:
+  fema: {state: ST, fips_county: "000", lookback_days: 365}
+  earthquakes: {min_magnitude: 2.5, lookback_days: 30}
+  # evac_zones: optional public ArcGIS FeatureServer layers (see miami.yaml)
+
+fire:
+  nws_station: KXXX
+  heat_index_watch_f: 103
+  heat_index_alert_f: 108
+  firms: {source: VIIRS_SNPP_NRT, days: 1}
+
+nws:
+  point: [0.0, 0.0]
+  zones: []                   # e.g. from api.weather.gov/zones?point=lat,lon
+
+neighborhoods:
+  - {id: center, name: City Center, lat: 0.0, lon: 0.0, zone: XXZ000}
+
+coastal_zones: []
+nearby_km: 6
+languages: [en, es]
