@@ -18,6 +18,11 @@ def fetch(city: dict) -> list[Observation]:
                                "parameterCd": cfg.get("parameter_cd", "00065"), "siteStatus": "active", "period": "PT3H"})
         r.raise_for_status()
         series = r.json()["value"]["timeSeries"]
+    return parse(series, cfg)
+
+
+def parse(series: list, cfg: dict) -> list[Observation]:
+    """Pure function (testable offline): NWIS timeSeries -> gauge Observations."""
     rise_lim = cfg.get("rapid_rise_ft_3h", 0.5)
     per_site = cfg.get("site_thresholds") or {}
     out = []
@@ -44,7 +49,7 @@ def fetch(city: dict) -> list[Observation]:
             place=Place(id=f"usgs-{site}", name=si["siteName"].title(), lat=geo["latitude"], lon=geo["longitude"]),
             time=to_utc_iso(vals[-1]["dateTime"]), measurement="gauge_height", value=last,
             unit=ts["variable"]["unit"]["unitCode"], threshold=thr, status=status,
-            extra={"rise_3h_ft": rise, "provisional": "P" in vals[-1].get("qualifiers", []),
+            extra={"kind": "gauge", "site_no": site, "rise_3h_ft": rise, "provisional": "P" in vals[-1].get("qualifiers", []),
                    "link": f"https://waterdata.usgs.gov/monitoring-location/{site}/"},
         ))
     return out

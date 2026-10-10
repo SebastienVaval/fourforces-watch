@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from adapters.base import SkipAdapter, discover  # noqa: E402
+from core import arcgis  # noqa: E402
 from core.city import load_city  # noqa: E402
 from core.http import client  # noqa: E402
 from core.schema import FORCES, Observation, to_cap, to_geojson, utcnow_iso  # noqa: E402
@@ -132,6 +133,12 @@ def refresh():
                                                    "doc": (mod.__doc__ or "").strip().splitlines()[0]}
                 if res is not None:
                     S.obs[mod.NAME] = res
+        with S.lock:  # simulated hotspots live under their own key, never inside nasa_firms
+            S.obs["demo_fire"] = demo_mode.fire_hotspots(S.city) if demo_mode.enabled() else []
+            S.obs["demo_land"] = demo_mode.land_evac_orders(S.city) if demo_mode.enabled() else []
+            # simulated AQI sensors only when no real AQI feed is live (no AirNow / PurpleAir key)
+            real_aqi = any(S.adapter_status.get(n, {}).get("ok") for n in ("airnow", "purpleair"))
+            S.obs["demo_air"] = demo_mode.air_sensors(S.city) if demo_mode.enabled() and not real_aqi else []
         cams = S.cameras()
         demo_cams = demo_mode.apply(cams, S.city) if demo_mode.enabled() else []
         for cam in cams:
@@ -148,7 +155,21 @@ def refresh():
         for t in tiles:
             statuses = {f: v["status"] for f, v in t["forces"].items()}
             facts = [r for v in t["forces"].values() for r in v["reasons"]]
-            t["message"] = messages.neighborhood_message(S.city["name"], t["name"], t["status"], statuses, facts)
+            ctx = t["forces"]["fire"].get("context") or {}
+            if t["forces"]["fire"]["status"] in ("watch", "alert") and ctx.get("cooling_centers"):
+                cc = ctx["cooling_centers"][0]
+                facts.append(f"Nearest cooling center: {cc['name']} ({cc['km']} km)")
+            lc = t["forces"]["land"].get("context") or {}
+            if t["forces"]["land"]["status"] in ("watch", "alert") and lc.get("nearest_shelter"):
+                sh = lc["nearest_shelter"]
+                facts.append(f"Nearest open shelter: {sh['name']} ({sh['km']} km)")
+            aq = (t["forces"]["air"].get("context") or {}).get("aqi") or {}
+            tips = {"air": "air_quality" if aq.get("status") in ("watch", "alert") else "storm"}
+            if aq.get("status") in ("watch", "alert"):
+                facts.append(f"Air quality index {aq['aqi']} ({aq['category']}), {aq['source']}"
+                             + (" - SIMULATED demo reading" if aq.get("simulated") else ""))
+            t["message"] = messages.neighborhood_message(S.city["name"], t["name"], t["status"], statuses, facts,
+                                                         tips=tips)
         with S.lock:
             S.board, S.last_refresh = tiles, utcnow_iso()
         log.info("refresh done in %.1fs: %d observations, %d cameras checked",
@@ -197,7 +218,39 @@ def api_status():
                    "vision_model": grok.vision_model(), "text_model": grok.text_model(),
                    "cameras_checked": sum(1 for d in S.detections.values() if d.get("water_on_road") is not None)},
             "last_refresh": S.last_refresh, "refreshing": S.refreshing, "refresh_seconds": REFRESH,
-            "adapters": S.adapter_status, "forces": FORCES}
+            "adapters": S.adapter_status, "forces": FORCES,
+            "overlays": arcgis.overlay_meta(S.city), "basemap": "mapbox" if _mapbox_token() else "carto/osm"}
+
+
+def _mapbox_token() -> str:
+    """Only public Mapbox tokens (pk.*) are ever sent to the browser."""
+    t = os.getenv("MAPBOX_TOKEN", "").strip()
+    return t if t.startswith("pk.") else ""
+
+
+@app.get("/api/config")
+def api_config():
+    """Front-end config. MAPBOX_TOKEN is a public (pk.) browser token; empty -> OSM/CARTO tiles."""
+    return {"mapbox_token": _mapbox_token() or None,
+            "mapbox_style": os.getenv("MAPBOX_STYLE", "mapbox/dark-v11"),
+            "center": S.city.get("center"), "zoom": S.city.get("zoom"),
+            "open_data": {k: arcgis.open_data(S.city).get(k) for k in ("portal", "attribution")}}
+
+
+@app.get("/api/overlays")
+def api_overlays():
+    return arcgis.overlay_meta(S.city)
+
+
+@app.get("/api/overlays/{overlay_id}")
+def api_overlay(overlay_id: str):
+    try:
+        fc = arcgis.overlay_geojson(S.city, overlay_id)
+    except Exception as e:
+        raise HTTPException(502, f"overlay source failed: {str(e)[:200]}")
+    if fc is None:
+        raise HTTPException(404, "overlay not found")
+    return JSONResponse(fc, media_type="application/geo+json", headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/api/observations")

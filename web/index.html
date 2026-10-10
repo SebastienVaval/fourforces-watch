@@ -18,7 +18,7 @@
   </nav>
   <div class="meta"><span id="lastRefresh">loading…</span> <button id="refreshBtn" title="Refresh now">↻</button></div>
 </header>
-<div id="demoBanner" class="demo-banner hidden">DEMO / SIMULATED: some camera images are replaced with archived, openly licensed Miami flood photos (CC0, Wikimedia Commons) to show detection on a dry day. Grok still analyses them live.</div>
+<div id="demoBanner" class="demo-banner hidden">DEMO / SIMULATED: some camera images are replaced with archived, openly licensed Miami flood photos (CC0, Wikimedia Commons) to show detection on a dry day, plus one SIMULATED satellite fire hotspot, one SIMULATED evacuation order flag <span id="bannerAqi">and SIMULATED AQI sensors (no AirNow/PurpleAir key) </span>(dashed yellow rings). Grok still analyses the images live.</div>
 <main>
   <section id="tab-map" class="tabpane active">
     <div id="map"></div>
@@ -29,7 +29,17 @@
         <label><input type="checkbox" data-force="land" checked> <span class="f land">Land</span></label>
         <label><input type="checkbox" data-force="fire" checked> <span class="f fire">Fire</span></label>
         <label><input type="checkbox" id="onlyChecked"> checked cameras only</label>
+        <label><input type="checkbox" id="showRefs" checked> county sites</label>
+        <button id="waterViewBtn" class="fireview waterview" title="Show only water layers">🌊 Water view</button>
+        <button id="airViewBtn" class="fireview airview" title="Show only air layers">💨 Air view</button>
+        <button id="landViewBtn" class="fireview landview" title="Show only land layers">⛰ Land view</button>
+        <button id="fireViewBtn" class="fireview" title="Show only fire layers">🔥 Fire view</button>
+        <button id="allViewBtn" class="fireview allview" title="Show all four forces">◎ All</button>
       </div>
+      <div id="waterBox" class="card hidden"></div>
+      <div id="airBox" class="card hidden"></div>
+      <div id="landBox" class="card hidden"></div>
+      <div id="fireBox" class="card hidden"></div>
       <div id="tideBox" class="card"></div>
       <div id="camSummary" class="card"></div>
       <h3>Area-wide alerts</h3>
@@ -45,6 +55,12 @@
       <div>Neighborhood status from public sensors and official alerts. Messages written by <b id="msgModel">Grok</b>.</div>
       <div class="langs"><button class="lang active" data-lang="en">English</button><button class="lang" data-lang="es">Español</button><button class="lang" data-lang="ht">Kreyòl</button></div>
     </div>
+    <div class="board-meta">
+      <div id="boardLegend" class="legend"><span><i class="dot ok"></i>ok</span><span><i class="dot watch"></i>watch</span><span><i class="dot alert"></i>alert</span><span><i class="dot grey"></i>unknown / no data</span>
+        <span class="small">chips: 💧 Water · 🌬 Air · ⛰ Land · 🔥 Fire · overall = worst of the four</span></div>
+      <div class="small">Last updated: <b id="boardUpdated">—</b></div>
+      <div id="boardSources" class="small"></div>
+    </div>
     <div id="tiles"></div>
     <p class="small">Not an official warning system. Always follow the National Weather Service and county emergency management.</p>
   </section>
@@ -57,9 +73,10 @@
         <li><a href="/api/cap" target="_blank">/api/cap</a>: watch/alert items as OASIS CAP 1.2 XML</li>
         <li><a href="/api/board" target="_blank">/api/board</a>: neighborhood Hazard Board</li>
         <li><a href="/api/status" target="_blank">/api/status</a>: feed health</li>
+        <li><a href="/api/overlays" target="_blank">/api/overlays</a>: county open-data map overlays (GeoJSON at /api/overlays/&lt;id&gt;)</li>
         <li><a href="/docs" target="_blank">/docs</a>: interactive API docs</li>
       </ul>
-      <p class="small">Camera snapshots: FL511 / Florida DOT, shown by direct link and analysed in memory only (never stored). Tide: NOAA CO-OPS. Gauges: USGS. Alerts: NWS. Storms: NHC. Disasters: OpenFEMA. Evacuation zones: Miami-Dade County GIS. AI: Grok via the xAI API.</p>
+      <p class="small">Camera snapshots: FL511 / Florida DOT, shown by direct link and analysed in memory only (never stored). Tide: NOAA CO-OPS. Gauges: USGS. Alerts: NWS. Storms: NHC. Disasters: OpenFEMA. Evacuation zones, storm surge planning zones, FEMA flood zones, canals, evacuation routes, fire stations, hospitals, cooling centers, hurricane bus pickups and urban heat islands: <a href="https://gis-mdc.opendata.arcgis.com/" target="_blank" rel="noopener">Miami-Dade County Open Data</a>. Basemap: Mapbox (when configured) or OpenStreetMap / CARTO. AI: Grok via the xAI API.</p>
     </div>
   </section>
   <section id="tab-status" class="tabpane">

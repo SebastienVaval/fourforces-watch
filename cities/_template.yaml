@@ -23,23 +23,37 @@ water:
     site_thresholds: {}
 
 air:
-  airnow: {distance_miles: 25}
+  airnow: {parameters: "PM25,OZONE,PM10", hours: 3}   # optional bbox: {...}; defaults to the city bbox
   purpleair: {max_sensors: 60}
   aqi_watch: 101
   aqi_alert: 151
+  sensor_radius_km: 5
+  # demo_sensors: [{name: "...", lat: 0.0, lon: 0.0, aqi: 128}]   # DEMO_MODE only, when no AQI key
   nhc_radius_km: 800
   nhc_alert_radius_km: 300
 
 land:
   fema: {state: ST, fips_county: "000", lookback_days: 365}
-  earthquakes: {min_magnitude: 2.5, lookback_days: 30}
+  earthquakes: {min_magnitude: 2.5, lookback_days: 30, watch_km: 150, alert_km: 50, alert_magnitude: 4.5}
   # evac_zones: optional public ArcGIS FeatureServer layers (see miami.yaml)
+  # county_gis:               # optional point layers from an ArcGIS Hub portal -> reference sites (never a status)
+  #   - {id: shelters, name: Shelter, url: https://.../FeatureServer/0, fields: NAME,ADDRESS, label_field: NAME}
 
 fire:
   nws_station: KXXX
   heat_index_watch_f: 103
   heat_index_alert_f: 108
-  firms: {source: VIIRS_SNPP_NRT, days: 1}
+  firms: {sources: [VIIRS_NOAA20_NRT, VIIRS_SNPP_NRT, MODIS_NRT], days: 2}   # optional bbox: {...}
+  hotspots: {min_confidence: nominal, alert_km: 5, watch_km: 15}
+  # context: {stations_layer: <county_gis id>, cooling_layer: <county_gis id>, cooling_count: 2}
+  # demo_hotspots: [{name: "...", lat: 0.0, lon: 0.0, frp: 10, confidence: nominal}]   # DEMO_MODE only
+
+# open_data:                  # optional ArcGIS Hub open-data portal (core/arcgis.py; any Hub city)
+#   portal: https://your-city.opendata.arcgis.com/
+#   attribution: Your County Open Data
+#   overlays:                 # polygon/line layers served at /api/overlays/<id>
+#     - {id: flood_zones, name: FEMA flood zones, force: water, url: https://.../FeatureServer/0,
+#        fields: FZONE, label_field: FZONE, simplify: 0.0005, color: "#38bdf8"}
 
 nws:
   point: [0.0, 0.0]

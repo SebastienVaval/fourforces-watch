@@ -24,18 +24,34 @@ water:
     parameter_cd: "00065"    # gauge height, ft
     rapid_rise_ft_3h: 0.5    # generic watch rule: rise faster than this over 3 h
     site_thresholds: {}      # optional {site_no: {watch: x, alert: y}}
+  flood_zones:               # FEMA FIRM zone at each neighborhood point (context only, never a status)
+    layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FEMAFloodZone_gdb/FeatureServer/0
+    field: FZONE
+  context:                   # Hazard Board water tile
+    camera_radius_km: 3      # nearest checked camera within this distance
+    gauge_radius_km: 10      # nearest USGS canal gauge within this distance
 
 air:
-  airnow: {distance_miles: 25}
-  purpleair: {max_sensors: 60}
-  aqi_watch: 101
-  aqi_alert: 151
+  airnow: {parameters: "PM25,OZONE,PM10", hours: 3}   # /aq/data/ monitors in bbox, latest hour each
+  purpleair: {max_sensors: 60, max_age_s: 3600, min_confidence: 50}   # outdoor sensors in bbox
+  aqi_watch: 101             # EPA "Unhealthy for Sensitive Groups"
+  aqi_alert: 151             # EPA "Unhealthy"
+  sensor_radius_km: 5        # tile AQI = median of sensors within this radius, else AirNow area AQI
+  # DEMO_MODE=1 only, and only while AirNow and PurpleAir are both off: clearly labelled SIMULATED sensors
+  demo_sensors:
+    - {name: "Doral (near SR-836 / Palmetto)", lat: 25.810, lon: -80.340, aqi: 128}
+    - {name: "Little Havana", lat: 25.770, lon: -80.220, aqi: 64}
+    - {name: "Miami Beach", lat: 25.795, lon: -80.135, aqi: 38}
   nhc_radius_km: 800         # storm center within 800 km -> watch
   nhc_alert_radius_km: 300   # within 300 km -> alert
 
 land:
   fema: {state: FL, fips_county: "086", lookback_days: 365}
-  earthquakes: {min_magnitude: 2.5, lookback_days: 30}
+  # per-neighborhood rule (forces/land.py): >= alert_magnitude within alert_km -> alert, any within watch_km -> watch
+  earthquakes: {min_magnitude: 2.5, lookback_days: 30, watch_km: 150, alert_km: 50, alert_magnitude: 4.5}
+  # DEMO_MODE=1 only: clearly labelled SIMULATED evacuation order flag (demo/demo_mode.py)
+  demo_evac_orders:
+    - {neighborhood: miami-beach, zone: A}
   evac_zones:
     zones_layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/HurricaneEvacZone_gdb/FeatureServer/0
     orders_layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationOrder/FeatureServer/0
@@ -44,11 +60,116 @@ land:
     # Order flags are shown as 'watch - confirm with official channels' unless true.
     trust_orders: false
 
+  # Reference sites from Miami-Dade County Open Data (ArcGIS Hub). Shown on the map, never change a tile status.
+  county_gis:
+    - id: mdc_evac_bus_pickup
+      name: Hurricane evacuation bus pickup point
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Hurricane_Bus_Stops/FeatureServer/0
+      fields: FACILITY,ADDRESS,CITY,EVACZONE,ACTIVE
+      label_field: FACILITY
+      measurement: evacuation_bus_pickup
+      link: https://www.miamidade.gov/global/emergency/hurricane/home.page
+    - id: mdc_hospitals
+      name: Hospital
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Miami_Dade_Hospitals/FeatureServer/0
+      fields: NAME,ADDRESS,CITY,BED,PHONE
+      label_field: NAME
+      measurement: hospital
+
 fire:
   nws_station: KMIA          # Miami International Airport
   heat_index_watch_f: 103
   heat_index_alert_f: 108
-  firms: {source: VIIRS_SNPP_NRT, days: 1}
+  firms:
+    sources: [VIIRS_NOAA20_NRT, VIIRS_NOAA21_NRT, VIIRS_SNPP_NRT, MODIS_NRT]
+    days: 2                  # FIRMS area API allows 1-10
+    # wider than the city bbox: includes the Everglades edge where most local fires start
+    bbox: {south: 25.13, north: 25.98, west: -81.00, east: -80.11}
+  hotspots:                  # per-neighborhood rule for satellite detections (forces/fire.py)
+    min_confidence: nominal  # low | nominal | high
+    alert_km: 5
+    watch_km: 15
+  context:                   # shown on the Hazard Board fire tile; never a status
+    stations_layer: mdc_fire_stations
+    cooling_layer: mdc_cooling_centers
+    cooling_count: 2
+  # DEMO_MODE=1 only: clearly labelled SIMULATED hotspot(s) for a dry-day demo (demo/demo_mode.py)
+  demo_hotspots:
+    - {name: "Everglades edge west of Doral (Krome Ave)", lat: 25.795, lon: -80.445, frp: 18.5, confidence: nominal}
+  county_gis:
+    - id: mdc_fire_stations
+      name: Fire station (Miami-Dade Fire Rescue)
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FireStation_gdb/FeatureServer/0
+      fields: NAME,ADDRESS,CITY,TYPE
+      label_field: NAME
+      measurement: fire_station
+    - id: mdc_cooling_centers
+      name: Cooling center (extreme heat)
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Cooling_Centers/FeatureServer/0
+      fields: Name,Street,City_1,Type,OperationalHours,PhoneNumbe
+      label_field: Name
+      measurement: cooling_center
+
+# Public open-data portal (ArcGIS Hub). Generic code in core/arcgis.py; any Hub city only edits this block.
+open_data:
+  portal: https://gis-mdc.opendata.arcgis.com/
+  attribution: Miami-Dade County Open Data
+  # Map overlays served at /api/overlays/<id> (GeoJSON, cached 6 h). simplify = maxAllowableOffset in degrees.
+  overlays:
+    - id: mdc_surge_zones
+      name: Storm surge planning / evacuation zones A-E
+      force: land
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/StormSurgePlanningZone_Multipart/FeatureServer/0
+      where: "ZONEID <> 'N'"
+      fields: ZONEID
+      label_field: ZONEID
+      simplify: 0.0005
+      style_field: ZONEID
+      styles: {A: "#dc2626", B: "#f97316", C: "#facc15", D: "#22c55e", E: "#3b82f6"}
+      default: true
+    - id: mdc_evac_routes
+      name: Primary evacuation routes
+      force: land
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/PrimaryEvacuationRoute_gdb/FeatureServer/0
+      fields: SN
+      label_field: SN
+      simplify: 0.0005
+      color: "#e879f9"
+    - id: mdc_fema_ve
+      name: FEMA flood zone VE (coastal high hazard)
+      force: water
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FEMAFloodZone_VEView/FeatureServer/0
+      fields: FZONE,ELEV
+      label_field: FZONE
+      simplify: 0.0005
+      page_size: 100          # this layer's maxRecordCount
+      color: "#0ea5e9"
+    - id: mdc_fema_ae
+      name: FEMA flood zone AE (1% annual chance)
+      force: water
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FEMAFloodZone_AEView/FeatureServer/0
+      fields: FZONE,ELEV
+      label_field: FZONE
+      simplify: 0.001
+      page_size: 100
+      color: "#38bdf8"
+    - id: mdc_canals
+      name: Canals
+      force: water
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Canal_gdb/FeatureServer/0
+      fields: NAME,TYPE,MAINTBY
+      label_field: NAME
+      simplify: 0.0005
+      color: "#22d3ee"
+    - id: mdc_heat_islands
+      name: Urban heat island effect by census tract (deg F)
+      force: fire
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Urban_Heat_Islands/FeatureServer/0
+      fields: urban_heat_island_effect_F,TRACT_FIPS,POPULATION
+      label_field: urban_heat_island_effect_F
+      simplify: 0.0005
+      style_field: urban_heat_island_effect_F
+      ramp: [[0, "#fde68a"], [8, "#fb923c"], [10, "#ef4444"], [12, "#991b1b"]]
 
 nws:
   point: [25.77, -80.19]
