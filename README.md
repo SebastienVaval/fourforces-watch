@@ -4,7 +4,8 @@
 
 > Built at **Hack for Humanity Miami** (The AI Collective × MLH Hacktoberfest Hack Day), The LAB Miami, Oct 10, 2026.
 > Track: **Build for Miami: 04 Data to Action** (secondary: 01 Four Forces, water).
-> Live demo: _<add URL>_ · Video: _<add URL>_ · Delivery tracking: [DELIVERY.md](DELIVERY.md) · Demo script: [docs/DEMO.md](docs/DEMO.md)
+> Repo: https://github.com/SebastienVaval/fourforces-watch · Live demo: _deploy pending (see [DEPLOY.md](DEPLOY.md))_ · Video: _link added at submission_ ·
+> Roadmap: [ROADMAP.md](ROADMAP.md) · Delivery tracking: [DELIVERY.md](DELIVERY.md) · Demo script: [docs/DEMO.md](docs/DEMO.md)
 
 ## What is in this project
 
