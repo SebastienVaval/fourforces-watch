@@ -10,10 +10,13 @@ _Last updated: Sat Oct 10, 2026, 2:40 PM ET._
 - Built at Hack for Humanity Miami, The LAB Miami, Oct 10, 2026. Track 04 Data to Action (secondary: 01 Four Forces, water).
 - Clock (ET): build 11:00 AM–3:30 PM · shortlist ~4:00 PM · hard submission deadline 4:30 PM.
 - Team: Sébastien Vaval, Enrique Escobar. Repo: https://github.com/SebastienVaval/fourforces-watch (public, MIT).
-- Branches: all work is done on `dev`, not `main`. Personal branches (`dev_seb`) and `feature/*` / `docs/*` branch
+- Branches: all work is done on `dev`, not `main`. Personal branches (`dev_seb`, `dev_enrique`) and `feature/*` / `docs/*` branch
   from `dev`, tests run, then merge into `dev`. No force-pushes. `main` stays untouched until the 3:45 PM ET
   submission freeze (M0.8), when `dev` is merged into `main` and tagged `v0.1`; after that, `main` changes only at a
   release tag.
+- Enrique's flow: work on `dev_enrique`, keep it updated from `dev`, then merge `dev_enrique` into `feature/fire`.
+- Split on Oct 10 afternoon: Sébastien built the fire force (M0.9) and then moved to air; Enrique owns the live
+  deploy (M0.6) and reviews fire.
 
 ## How the app works
 
@@ -31,6 +34,14 @@ _Last updated: Sat Oct 10, 2026, 2:40 PM ET._
   neighborhood, or is area-scoped and its zone list is empty or includes the tile's NWS zone, or is a point within
   `nearby_km` (6 km for Miami). Tide readings count only for `coastal_zones`. Open shelters never raise a status.
 - A force with no relevant observations is `unknown`, not `ok`. A tile's status is the worst of its four forces.
+- `dev` has 17 adapters: the original 15 plus `county_gis_fire` and `county_gis_land`, both thin wrappers over
+  `core/arcgis.py`. County responses are cached in memory for 6 hours, so a restart refetches everything.
+- County reference sites still appear in `/api/observations` and `/api/geojson` with status `ok` and
+  `extra.reference = true` (306 items for Miami). Consumers that count `ok` items should filter on that flag.
+- Reference-site ids are positional (`mdc_fire_stations-0`, `-1`, …) because `OBJECTID` is not in the requested
+  fields. They are unique but not stable across changes to the county layer.
+- Overlays are fetched on first request, not at startup. Measured Oct 10: FEMA AE is 2.4 MB and takes about 4 s;
+  the other five are under 1 MB and about 1 s each.
 
 ## Grok (xAI API)
 
@@ -70,6 +81,11 @@ _Last updated: Sat Oct 10, 2026, 2:40 PM ET._
 - Hosting needs a long-lived container (background refresh loop). Serverless and static hosts such as Vercel do not
   fit. The container listens on `PORT`, default 7860.
 - Render's free plan sleeps when idle; the first request after a sleep is slow and state is empty.
+- Until the freeze, deploy from `dev`. `main` does not have the county layers, overlays or Mapbox support.
+- If one county layer fails and another succeeds, `layer_observations` drops the error and the Status tab still
+  shows the adapter as live. Compare item counts (fire 140, land 166) when something looks missing.
+- Keep the planning files in UTF-8. An editor saving in a Windows code page turned "é", "→" and "–" into garbage
+  in TO-DO.md once already.
 - Miami tide thresholds in `cities/miami.yaml` are in ft MLLW, converted from NOAA's station datum (MLLW = 10.13 ft
   STND): watch 3.0, minor 3.53, moderate 3.93, major 4.73.
 - NWS requires a contact in the User-Agent; set `CONTACT` on any real deployment.
