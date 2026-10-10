@@ -1,0 +1,36 @@
+# Delivery tracking - Hack for Humanity Miami (Oct 10, 2026)
+
+Build window 11:00 AM - 3:30 PM ET · shortlist ~4:00 PM ET, final submission deadline 4:30 PM ET · times are ET.
+Live feed health is at `/api/status` and in the web UI's **Status** tab.
+
+| # | Piece | Status | Owner | Updated (ET) | Milestone | Notes |
+|---|---|---|---|---|---|---|
+| 1 | L0 adapters: water: FL511 cameras, NOAA tide, USGS gauges, NWS flood alerts | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Verified live: 389 cameras, tide, 61 gauges, 1 NWS coastal flood statement |
+| 2 | L0 adapters: air: NHC storms, NWS wind/tropical | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Verified live (3 storms, none near) |
+| 3 | L0 adapters: air: AirNow, PurpleAir | Needs key | Enrique | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Code done; skip gracefully without `AIRNOW_API_KEY` / `PURPLEAIR_API_KEY` |
+| 4 | L0 adapters: land: evacuation zones/orders/shelters, OpenFEMA, USGS earthquakes, NWS land | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Verified live (10 zones; FEMA/quakes currently empty) |
+| 5 | L0 adapters: fire: NWS heat index (observed + 12 h forecast), NWS heat/fire alerts | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Verified live (HI 100 F now, 104 F forecast → watch) |
+| 6 | L0 adapters: fire: NASA FIRMS | Needs key | Enrique | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Code done; needs `FIRMS_MAP_KEY` |
+| 7 | Flood check on camera images (Grok via xAI API) | Needs key | Sébastien | Oct 10 11:20 | [M0.2](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Code + tests done; request reaches xAI auth; needs `XAI_API_KEY` for a real run |
+| 8 | L1 force rules + Hazard Board (4 badges, reasons) | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | 10 neighborhoods |
+| 9 | Trilingual messages EN/ES/HT (Grok) | Needs key | Enrique | Oct 10 11:20 | [M0.2](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Template fallback works now; Grok text needs `XAI_API_KEY` |
+| 10 | L2 city packs (miami.yaml + template) | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | |
+| 11 | L3 open API: JSON `/api/observations` | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | |
+| 12 | L3 GeoJSON export `/api/geojson` | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | |
+| 13 | L3 CAP 1.2 export `/api/cap` | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Parses as XML; 3 alerts live |
+| 14 | Web map (Leaflet), force layers, camera popups | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Check visually in a browser before the demo |
+| 15 | Status tab + `/api/status` (last fetch, last success, count, error) | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | |
+| 16 | Demo mode (CC0 2016 Miami flood photos, SIMULATED banner) + docs/DEMO.md | Done | Enrique | Oct 10 11:20 | [M0.3](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Rehearse the 2-minute script |
+| 17 | Deploy config (Dockerfile, render.yaml, HF Space header) | Done | Enrique | Oct 10 11:20 | [M0.6](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Config only |
+| 18 | Live demo URL (deployed) | Not started | Enrique | — | [M0.6](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Deploy per DEPLOY.md; set `XAI_API_KEY` as a secret |
+| 19 | Backup demo video | Done | Enrique | Oct 10 11:35 | [M0.3](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | 115 s, 1280×720, captions; recorded by `scripts/record_demo.py` (kept outside the repo) |
+| 20 | Public GitHub repo (MIT) | Not started | Sébastien | — | [M0.5](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Personal account; never commit `.env` |
+| 21 | README | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Add live URL + video link once available |
+| 22 | OrganizerHQ submission | Not started | Sébastien | — | [M0.7](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Shortlist ~4:00 PM, deadline 4:30 PM ET |
+| 23 | ROADMAP.md (public): numbered milestones | Done | Sébastien | Oct 10 11:40 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Merged from docs/roadmap |
+| 24 | Cursor project rules `.cursor/rules/fourforces.mdc` | Done | Sébastien | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Adapter interface, schema, no secrets, tests, no proprietary content |
+| 25 | `AGENTS.md` (guidance for AI coding agents) | Done | Sébastien | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Same rules as Cursor |
+| 26 | CI workflow `.github/workflows/tests.yml` (pytest on push/PR) | In progress | Enrique | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | File committed; first green run after the GitHub push |
+| 27 | Feature branches (water, air, land, fire, dashboard, demo, docs/roadmap) | Done | Sébastien | Oct 10 11:26 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | `main` = integrated app |
+
+Owners are the planned split. Edit them as the team decides.
