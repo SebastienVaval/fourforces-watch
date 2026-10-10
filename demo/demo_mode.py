@@ -78,3 +78,51 @@ def apply(cameras: list[Observation], city: dict) -> list[Observation]:
                           "image_page": img["page"]})
         chosen.append(cam)
     return chosen
+
+
+def fire_hotspots(city: dict) -> list[Observation]:
+    """SIMULATED satellite fire detections from the city pack (``fire.demo_hotspots``) for a dry-day demo.
+
+    Own source name (``demo_fire``) so they never mix with real NASA FIRMS data, and labelled SIMULATED in
+    ``extra.simulated``, the headline, the map popup and the page banner.
+    """
+    from core.schema import Place, utcnow_iso
+    out = []
+    for i, h in enumerate((city.get("fire") or {}).get("demo_hotspots") or []):
+        conf = h.get("confidence", "nominal")
+        out.append(Observation(
+            force="fire", source="demo_fire",
+            place=Place(id=f"sim-fire-{i}", name=f"SIMULATED fire detection: {h.get('name', 'demo')}",
+                        lat=float(h["lat"]), lon=float(h["lon"])),
+            time=utcnow_iso(), measurement="active_fire", value=float(h.get("frp", 10.0)), unit="MW FRP",
+            threshold="detection within watch_km", status="alert" if conf == "high" else "watch",
+            extra={"kind": "hotspot", "simulated": True, "confidence": conf, "product": "SIMULATED",
+                   "headline": f"SIMULATED: satellite fire detection near {h.get('name', 'demo')} ({conf} confidence)",
+                   "note": "Demo only (DEMO_MODE=1). Not a real detection; real ones come from NASA FIRMS."},
+        ))
+    return out
+
+
+def air_sensors(city: dict) -> list[Observation]:
+    """SIMULATED AQI sensors from the city pack (``air.demo_sensors``) for a demo without AirNow/PurpleAir keys.
+
+    Only used when both real AQI adapters are skipped. Own source name (``demo_air``), ``extra.simulated``,
+    SIMULATED names/headlines; never mixed with real readings.
+    """
+    from adapters.air._aqi import category, status
+    from core.schema import Place, utcnow_iso
+    air = city.get("air") or {}
+    out = []
+    for i, s in enumerate(air.get("demo_sensors") or []):
+        aqi = int(s["aqi"])
+        out.append(Observation(
+            force="air", source="demo_air",
+            place=Place(id=f"sim-aqi-{i}", name=f"SIMULATED AQI sensor: {s.get('name', 'demo')}",
+                        lat=float(s["lat"]), lon=float(s["lon"])),
+            time=utcnow_iso(), measurement="AQI PM2.5 (SIMULATED)", value=aqi, unit="AQI",
+            threshold=air.get("aqi_watch", 101), status=status(aqi, air),
+            extra={"kind": "aqi_sensor", "simulated": True, "network": "SIMULATED", "category": category(aqi),
+                   "headline": f"SIMULATED: AQI {aqi} ({category(aqi)}) at {s.get('name', 'demo')}",
+                   "note": "Demo only (DEMO_MODE=1, no AirNow/PurpleAir key). Not a real reading."},
+        ))
+    return out

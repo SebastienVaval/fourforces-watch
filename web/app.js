@@ -19,7 +19,8 @@ document.querySelectorAll('.lang').forEach(b => b.onclick = () => {
 
 const map = L.map('map').setView([25.77, -80.25], 10);
 const layers = Object.fromEntries(['water', 'air', 'land', 'fire'].map(f => [f, L.layerGroup().addTo(map)]));
-const refLayer = L.layerGroup().addTo(map);  // county reference sites (never change a status)
+const OVERLAYS = {};  // overlay id -> Leaflet layer (filled by initMapLayers)
+let fireView = false;
 
 // Basemap: Mapbox when the server has a public MAPBOX_TOKEN (pk.*), else free OSM/CARTO tiles.
 const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
@@ -51,7 +52,7 @@ async function initMapLayers() {
     {attribution: OSM_ATTR + ' &copy; CARTO', maxZoom: 19});
   Object.values(base)[0].addTo(map);
   const attribution = (cfg.open_data && cfg.open_data.attribution) || '';
-  const over = {'County reference sites': refLayer};
+  const over = {};
   let metas = [];
   try { metas = await (await fetch('/api/overlays')).json(); } catch (e) { /* no overlays */ }
   for (const m of metas) {
@@ -66,6 +67,7 @@ async function initMapLayers() {
       catch (e) { lyr._loaded = false; }
     });
     over[`<span class="f ${esc(m.force)}">${esc(LABEL[m.force] || m.force)}</span> ${esc(m.name)}`] = lyr;
+    OVERLAYS[m.id] = lyr;
     if (m.default) lyr.addTo(map);
   }
   L.control.layers(base, over, {collapsed: true, position: 'topleft'}).addTo(map);
@@ -74,6 +76,40 @@ initMapLayers();
 document.querySelectorAll('.layers input[data-force]').forEach(cb => cb.onchange = () =>
   cb.checked ? layers[cb.dataset.force].addTo(map) : map.removeLayer(layers[cb.dataset.force]));
 document.getElementById('onlyChecked').onchange = renderMap;
+document.getElementById('showRefs').onchange = renderMap;
+
+// Fire view: only fire layers (hotspots, stations, cooling centers, heat-island overlay) + fire legend/summary.
+const FIRE_OVERLAY = 'mdc_heat_islands';
+let savedChecks = null, savedOverlays = [];
+const VIEWS = {fire: {forces: ['fire'], overlays: [FIRE_OVERLAY], box: 'fireBox', btn: 'fireViewBtn'},
+               air: {forces: ['air'], overlays: [], box: 'airBox', btn: 'airViewBtn'}};
+let activeView = null;
+function setView(name) {
+  const boxes = [...document.querySelectorAll('.layers input[data-force]')];
+  if (activeView) {  // leave the current view: restore layers and overlays
+    boxes.forEach((cb, i) => { cb.checked = savedChecks ? savedChecks[i] : true; cb.onchange(); });
+    VIEWS[activeView].overlays.forEach(id => OVERLAYS[id] && map.removeLayer(OVERLAYS[id]));
+    savedOverlays.forEach(id => OVERLAYS[id].addTo(map));
+    document.getElementById(VIEWS[activeView].btn).classList.remove('active');
+    document.getElementById(VIEWS[activeView].box).classList.add('hidden');
+  }
+  activeView = name === activeView ? null : name;
+  fireView = activeView === 'fire';
+  if (activeView) {
+    const v = VIEWS[activeView];
+    savedChecks = boxes.map(cb => cb.checked);
+    boxes.forEach(cb => { cb.checked = v.forces.includes(cb.dataset.force); cb.onchange(); });
+    document.getElementById('showRefs').checked = true;
+    savedOverlays = Object.keys(OVERLAYS).filter(id => map.hasLayer(OVERLAYS[id]));
+    savedOverlays.forEach(id => map.removeLayer(OVERLAYS[id]));
+    v.overlays.forEach(id => OVERLAYS[id] && OVERLAYS[id].addTo(map));
+    document.getElementById(v.btn).classList.add('active');
+    document.getElementById(v.box).classList.remove('hidden');
+  }
+  renderMap(); renderFire(); renderAir();
+}
+document.getElementById('fireViewBtn').onclick = () => setView('fire');
+document.getElementById('airViewBtn').onclick = () => setView('air');
 
 const tide = () => OBS.find(o => o.source === 'noaa_tide');
 
@@ -115,6 +151,84 @@ function popupFor(o) {
     <div class="small">${esc(o.source)} · ${fmt(o.time)}</div></div>`;
 }
 
+const REF_COLORS = {mdc_fire_stations: '#f43f5e', mdc_cooling_centers: '#22d3ee', mdc_hospitals: '#e2e8f0', mdc_evac_bus_pickup: '#f59e0b'};
+
+function hotspotPopup(o) {
+  const ex = o.extra, ns = ex.nearest_station;
+  return `<div class="popup"><b>${esc(ex.simulated ? 'Fire detection (demo)' : o.place.name)}</b><br>
+    ${ex.simulated ? '<div class="sim">SIMULATED HOTSPOT (demo)</div>' : ''}
+    Confidence: <b>${esc(ex.confidence)}</b> · FRP <b>${esc(o.value)} MW</b><br>
+    ${esc(ex.simulated ? 'demo, not a satellite pass' : `${ex.product || ''} ${ex.satellite || ''} · ${ex.daynight === 'N' ? 'night' : 'day'} pass`)}
+    · ${fmt(o.time)}<br>
+    ${ns ? `Nearest fire station: <b>${esc(ns.name)}</b> (${ns.km} km straight line)<br>` : ''}
+    ${ex.note ? `<div class="small">${esc(ex.note)}</div>` : ''}
+    ${ex.link ? `<a href="${esc(ex.link)}" target="_blank" rel="noopener">NASA FIRMS map</a>` : ''}
+    <div class="small">${esc(o.source)} · Report fires to 911. Not an official warning.</div></div>`;
+}
+
+const AQI_CATS = [[50, '#00e400', 'Good'], [100, '#ffff00', 'Moderate'], [150, '#ff7e00', 'Unhealthy for Sensitive Groups'],
+  [200, '#ff0000', 'Unhealthy'], [300, '#8f3f97', 'Very Unhealthy'], [1e9, '#7e0023', 'Hazardous']];
+const aqiColor = v => v == null ? COLORS.unknown : AQI_CATS.find(c => v <= c[0])[1];
+
+function aqiPopup(o) {
+  const ex = o.extra;
+  return `<div class="popup"><b>${esc(ex.simulated ? 'AQI sensor (demo)' : o.place.name)}</b><br>
+    ${ex.simulated ? '<div class="sim">SIMULATED AQI (demo)</div>' : ''}
+    AQI <b style="color:${aqiColor(o.value)}">${esc(o.value)}</b> · ${esc(ex.category || '')}<br>
+    <span class="small">${esc(o.measurement)}${ex.pm25_ugm3 != null ? ` · PM2.5 ${esc(ex.pm25_ugm3)} µg/m³` : ''}
+    ${ex.network ? ' · ' + esc(ex.network) : ''} · ${fmt(o.time)}</span>
+    ${ex.note ? `<div class="small">${esc(ex.note)}</div>` : ''}
+    ${ex.link ? `<br><a href="${esc(ex.link)}" target="_blank" rel="noopener">source</a>` : ''}
+    <div class="small">Not an official warning. Check airnow.gov.</div></div>`;
+}
+
+function renderAir() {
+  const box = document.getElementById('airBox');
+  if (activeView !== 'air') return;
+  const sens = OBS.filter(o => o.extra.kind === 'aqi_sensor'), sim = sens.filter(o => o.extra.simulated);
+  const area = OBS.filter(o => o.extra.kind === 'aqi_area' || o.extra.network === 'AirNow');
+  const storms = OBS.filter(o => o.source === 'nhc_storms');
+  const wind = OBS.filter(o => o.force === 'air' && o.source === 'nws_wind_alerts');
+  const ad = n => STATUS && STATUS.adapters[n];
+  const feed = n => { const a = ad(n); return a ? (a.ok ? `<span class="pill ok">live</span> ${a.count}` : `<span class="pill skip">${esc(needsKey(a.skipped) || 'off')}</span>`) : '—'; };
+  box.innerHTML = `<h4>Air view</h4>
+    <div>AirNow: ${feed('airnow')} · PurpleAir: ${feed('purpleair')}</div>
+    <div>AQI sensors: <b>${sens.length - sim.length}</b> real${sim.length ? ` · <span class="sim">${sim.length} SIMULATED</span>` : ''}
+      · of which official AirNow: <b>${area.length}</b></div>
+    <div>Tropical systems (NHC): <b>${storms.length}</b>${storms.map(s => `<div class="small">${esc(s.extra.headline || s.place.name)}</div>`).join('')}</div>
+    <div>NWS wind / tropical / air alerts: <b>${wind.length}</b></div>
+    <div class="legend">${AQI_CATS.map(([lim, c, n], i) => `<span><i class="dot" style="background:${c}"></i>${n} (${i ? AQI_CATS[i - 1][0] + 1 : 0}${lim < 1e9 ? '–' + lim : '+'})</span>`).join('')}
+      <span><i class="dot" style="background:#f97316;outline:2px dashed #fde047"></i>SIMULATED</span>
+      <span><i class="dot" style="background:#64748b;outline:2px solid #e879f9"></i>storm center</span></div>
+    <div class="small">Board rule: tile AQI = median of monitors/sensors within 5 km (worst pollutant each), else the worst AirNow reading city-wide. AQI ≥ 101 = watch, ≥ 151 = alert
+      (EPA 2024 PM2.5 breakpoints; PurpleAir EPA-corrected). Storm within 800 km = watch, 300 km = alert.</div>`;
+}
+
+function renderFire() {
+  const box = document.getElementById('fireBox');
+  if (activeView !== 'fire') return;
+  const hs = OBS.filter(o => o.extra.kind === 'hotspot'), real = hs.filter(o => !o.extra.simulated);
+  const hi = OBS.find(o => o.measurement === 'heat_index_observed'), hf = OBS.find(o => o.measurement === 'heat_index_forecast_max_12h');
+  const alerts = OBS.filter(o => o.force === 'fire' && o.source === 'nws_heat_fire_alerts');
+  const nRef = id => OBS.filter(o => o.extra.layer === id).length;
+  const firms = STATUS && STATUS.adapters.nasa_firms;
+  box.innerHTML = `<h4>Fire view</h4>
+    <div>Satellite hotspots (NASA FIRMS, 48 h): <b>${real.length}</b> real${hs.length > real.length ? ` · <span class="sim">${hs.length - real.length} SIMULATED</span>` : ''}
+      ${firms && !firms.ok ? `<div class="small">FIRMS: ${esc(firms.skipped || firms.error || 'off')}</div>` : ''}</div>
+    <div>Heat index now: <b>${hi ? esc(hi.value) + ' F' : '—'}</b> <span class="st ${hi ? hi.status : 'unknown'}">${hi ? esc(hi.status) : ''}</span>
+      · 12 h peak: <b>${hf ? esc(hf.value) + ' F' : '—'}</b> <span class="st ${hf ? hf.status : 'unknown'}">${hf ? esc(hf.status) : ''}</span></div>
+    <div>NWS heat / red flag alerts: <b>${alerts.length}</b>${alerts.map(a => `<div class="small">${esc(a.measurement)}</div>`).join('')}</div>
+    <div class="legend fire-legend">
+      <span><i class="dot" style="background:#dc2626"></i>hotspot, high conf.</span><span><i class="dot" style="background:#f97316"></i>nominal</span>
+      <span><i class="dot" style="background:#fbbf24"></i>low</span><span><i class="dot" style="background:#f97316;outline:2px dashed #fde047"></i>SIMULATED</span>
+      <span><i class="dot" style="background:${REF_COLORS.mdc_fire_stations}"></i>fire station (${nRef('mdc_fire_stations')})</span>
+      <span><i class="dot" style="background:${REF_COLORS.mdc_cooling_centers}"></i>cooling center (${nRef('mdc_cooling_centers')})</span>
+      <span><i class="dot" style="background:linear-gradient(90deg,#fde68a,#ef4444,#991b1b)"></i>urban heat island (°F above rural)</span>
+    </div>
+    <div class="small">Board rule: a hotspot of nominal+ confidence within 15 km of a neighborhood = watch, within 5 km = alert.
+      Heat index ≥ 103 F = watch, ≥ 108 F = alert. Sources: NASA FIRMS, NWS, Miami-Dade County Open Data.</div>`;
+}
+
 function refPopup(o) {
   const p = o.extra.properties || {};
   return `<div class="popup"><b>${esc(o.place.name)}</b><br>${esc(LABEL[o.force])} · ${esc(o.extra.layer_name || o.measurement)}<br>
@@ -124,7 +238,8 @@ function refPopup(o) {
 }
 
 function renderMap() {
-  Object.values(layers).forEach(l => l.clearLayers()); refLayer.clearLayers(); markers = {};
+  Object.values(layers).forEach(l => l.clearLayers()); markers = {};
+  const showRefs = document.getElementById('showRefs').checked;
   const onlyChecked = document.getElementById('onlyChecked').checked;
   for (const o of OBS) {
     if (o.place.lat == null || o.place.lon == null) continue;
@@ -136,10 +251,33 @@ function renderMap() {
         .bindPopup(() => cameraPopup(o), {maxWidth: 340}).addTo(layers.water);
       continue;
     }
+    if (o.extra.kind === 'aqi_sensor' || o.extra.kind === 'aqi_area') {  // AQI: EPA category colors
+      const area = o.extra.kind === 'aqi_area';
+      markers[o.place.id] = L.circleMarker([o.place.lat, o.place.lon], {
+        radius: area ? 14 : 8, color: o.extra.simulated ? '#fde047' : '#0f172a', weight: o.extra.simulated ? 3 : 1,
+        dashArray: o.extra.simulated ? '4 3' : null, fillColor: aqiColor(o.value), fillOpacity: area ? .45 : .9})
+        .bindPopup(aqiPopup(o), {maxWidth: 320}).addTo(layers.air);
+      continue;
+    }
+    if (o.source === 'nhc_storms') {  // storm center (NHC), even though it is area-scoped
+      L.circleMarker([o.place.lat, o.place.lon], {radius: 11, color: '#e879f9', weight: 3,
+        fillColor: COLORS[o.status] || COLORS.unknown, fillOpacity: .8}).bindPopup(popupFor(o)).addTo(layers.air);
+      continue;
+    }
     if (o.extra.scope === 'area' && o.source !== 'noaa_tide' && o.source !== 'nws_heat_index') continue;  // side panel
-    if (o.extra.reference) {  // county open-data reference site: small square-ish marker, info only
+    if (o.extra.reference) {  // county open-data reference site: small marker, info only
+      if (!showRefs) continue;
+      const fc = REF_COLORS[o.extra.layer] || FORCE_COLORS[o.force];
       L.circleMarker([o.place.lat, o.place.lon], {radius: 4, color: '#0f172a', weight: 1,
-        fillColor: FORCE_COLORS[o.force], fillOpacity: .95}).bindPopup(refPopup(o)).addTo(refLayer);
+        fillColor: fc, fillOpacity: .95}).bindPopup(refPopup(o)).addTo(layers[o.force] || layers.land);
+      continue;
+    }
+    if (o.extra.kind === 'hotspot') {  // satellite fire detection (real FIRMS or SIMULATED demo)
+      markers[o.place.id] = L.circleMarker([o.place.lat, o.place.lon], {
+        radius: Math.min(16, 7 + Math.sqrt(o.value || 1)), color: o.extra.simulated ? '#fde047' : '#7f1d1d',
+        weight: o.extra.simulated ? 3 : 2, dashArray: o.extra.simulated ? '4 3' : null,
+        fillColor: o.extra.confidence === 'high' ? '#dc2626' : o.extra.confidence === 'nominal' ? '#f97316' : '#fbbf24',
+        fillOpacity: .9}).bindPopup(hotspotPopup(o), {maxWidth: 320}).addTo(layers.fire);
       continue;
     }
     L.circleMarker([o.place.lat, o.place.lon], {radius: o.source === 'noaa_tide' ? 10 : 6, color: FORCE_COLORS[o.force],
@@ -167,6 +305,21 @@ function renderSide() {
     ${a.extra.ends ? `<div class="small">until ${fmt(a.extra.ends)}</div>` : ''}</div>`).join('') : '<div class="small">None right now.</div>';
 }
 
+function airCtx(c) {
+  if (!c || (!c.aqi && !c.nearest_storm)) return '';
+  const a = c.aqi;
+  return `<div class="airctx">${a ? `<div>AQI <b style="color:${aqiColor(a.aqi)}">${esc(a.aqi)}</b> ${esc(a.category)}
+      <span class="small">(${esc(a.source)})</span>${a.simulated ? ' <span class="sim">SIMULATED</span>' : ''}</div>` : ''}
+    ${c.nearest_storm ? `<div>Nearest storm: <b>${esc(c.nearest_storm.name)}</b> ${esc(c.nearest_storm.km)} km</div>` : ''}</div>`;
+}
+
+function fireCtx(c) {
+  if (!c || (!c.nearest_station && !c.cooling_centers)) return '';
+  return `<div class="firectx">${c.nearest_station ? `<div>Fire station: <b>${esc(c.nearest_station.name)}</b> ${c.nearest_station.km} km</div>` : ''}
+    ${c.cooling_centers ? `<div>Cooling: ${c.cooling_centers.map(x => `<b>${esc(x.name)}</b> ${x.km} km`).join(' · ')}</div>` : ''}
+    ${c.nearest_hotspot ? `<div>Nearest hotspot: ${c.nearest_hotspot.km} km${c.nearest_hotspot.simulated ? ' <span class="sim">SIMULATED</span>' : ''}</div>` : ''}</div>`;
+}
+
 function renderBoard() {
   if (!BOARD) return;
   document.getElementById('tiles').innerHTML = BOARD.tiles.map(t => {
@@ -175,11 +328,13 @@ function renderBoard() {
     const reasons = Object.values(t.forces).flatMap(f => f.reasons).slice(0, 4).map(r => `<li>${esc(r)}</li>`).join('');
     return `<div class="tile ${t.status}"><h3>${esc(t.name)}<span class="small">${esc(t.zone || '')}</span></h3>
       <div class="badges">${badges}</div><div class="msg">${esc((t.message || {})[lang] || '')}</div>
-      ${reasons ? `<ul class="reasons">${reasons}</ul>` : ''}<div class="small">message by: ${esc((t.message || {}).by || '')}</div></div>`;
+      ${reasons ? `<ul class="reasons">${reasons}</ul>` : ''}${airCtx(t.forces.air.context)}${fireCtx(t.forces.fire.context)}<div class="small">message by: ${esc((t.message || {}).by || '')}</div></div>`;
   }).join('');
   const by = BOARD.tiles.map(t => (t.message || {}).by).find(b => b && b !== 'template');
   document.getElementById('msgModel').textContent = by || 'templates (no xAI key)';
 }
+
+const needsKey = msg => { const m = /([A-Z][A-Z0-9_]*_(?:KEY|TOKEN))/.exec(msg || ''); return m ? 'needs ' + m[1] : null; };
 
 function renderFeeds() {
   const ai = STATUS.ai;
@@ -190,7 +345,7 @@ function renderFeeds() {
   document.getElementById('statusRefreshed').textContent = 'page updated ' + fmt(new Date().toISOString());
   const rows = Object.entries(STATUS.adapters).sort((a, b) => a[1].force.localeCompare(b[1].force));
   document.querySelector('#feeds tbody').innerHTML = rows.map(([k, v]) => `<tr><td>${esc(k)}<div class="small">${esc(v.doc || '')}</div></td>
-    <td>${esc(v.force)}</td><td><span class="pill ${v.ok ? 'ok' : v.skipped ? 'skip' : 'err'}">${v.ok ? 'live' : v.skipped ? 'needs key / off' : 'error'}</span></td>
+    <td>${esc(v.force)}</td><td><span class="pill ${v.ok ? 'ok' : v.skipped ? 'skip' : 'err'}">${v.ok ? 'live' : v.skipped ? esc(needsKey(v.skipped) || 'off') : 'error'}</span></td>
     <td>${v.count ?? ''}</td><td>${fmt(v.last_run)}</td><td>${fmt(v.last_ok)}</td><td>${v.ms != null ? v.ms + ' ms' : ''}</td>
     <td class="small">${esc(v.skipped || v.error || '')}</td></tr>`).join('');
 }
@@ -203,7 +358,7 @@ async function load() {
   document.getElementById('demoBanner').classList.toggle('hidden', !s.demo_mode);
   document.getElementById('lastRefresh').textContent = s.last_refresh ? 'updated ' + fmt(s.last_refresh) : 'first refresh running…';
   if (first && s.city.center) map.setView(s.city.center, s.city.zoom || 10);
-  renderMap(); renderSide(); renderBoard(); renderFeeds();
+  renderMap(); renderSide(); renderBoard(); renderFeeds(); renderFire(); renderAir();
   if (!s.last_refresh) setTimeout(load, 4000);
 }
 document.getElementById('refreshBtn').onclick = async () => {

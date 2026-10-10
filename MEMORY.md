@@ -3,7 +3,7 @@
 Facts about this project that are easy to forget and slow to rediscover. Not a changelog (that is git) and not a
 status board (that is [DELIVERY.md](DELIVERY.md)). Plan: [PLAN.md](PLAN.md). Open items: [TO-DO.md](TO-DO.md).
 
-_Last updated: Sat Oct 10, 2026, 1:40 PM ET._
+_Last updated: Sat Oct 10, 2026, 2:40 PM ET._
 
 ## Context
 
@@ -100,3 +100,28 @@ _Last updated: Sat Oct 10, 2026, 1:40 PM ET._
   `forces/base.applies_to`, so a fire station never turns a tile's fire badge from `unknown` to `ok`.
 - `MAPBOX_TOKEN` is read from env and sent to the browser via `/api/config` only if it starts with `pk.`. Never put
   the token in a tracked file; on Render it is a `sync: false` secret.
+- Fire hotspot status is per tile, not per observation: `forces/fire.status_for` uses distance + confidence from
+  `fire.hotspots`. The engine supports optional per-force hooks `status_for`, `annotate` and `context`
+  (`forces/engine.py`); forces without them behave as before.
+- FIRMS: one request per product (`fire.firms.sources`); the area API returns a header-only CSV when there are no
+  fires, and text starting with "Invalid" for a bad key. MODIS confidence is 0-100, VIIRS is l/n/h; both are
+  normalised in `adapters/fire/firms.norm_confidence`. Most days Miami-Dade has 0 detections: use the demo hotspot.
+- The SIMULATED fire hotspot is stored under `S.obs["demo_fire"]` (source `demo_fire`), never inside `nasa_firms`,
+  and is empty when `DEMO_MODE` is off.
+- Fire view in the dashboard turns off the non-fire overlays and restores them on exit; the heat-island overlay id is
+  hard-coded as `mdc_heat_islands` in `web/app.js`.
+- Air tile AQI is computed once per board in `forces/air.annotate` (module cache `_TILE`), then used by
+  `relevant` / `status_for` / `context`. Sensors = `extra.kind == "aqi_sensor"` (AirNow monitors, PurpleAir,
+  demo), worst pollutant per monitor (`extra.station_id`), median across monitors within `sensor_radius_km`. With
+  none near, the worst official AirNow reading city-wide applies (legacy `kind == "aqi_area"` rows still work).
+- PurpleAir: `X-API-Key` header, `location_type=0`, bbox `nwlng/nwlat/selng/selat`. The EPA correction needs
+  `pm2.5_cf_1` + `humidity`; the 10-minute average is the fallback. A 401/403 is reported as skipped, not an error.
+- AirNow retired `/aq/observation/latLong/current/` and `zipCode/current` on Oct 1, 2026: they answer HTTP 200 with
+  `{"WebServiceError":[{"Message":"This web service has been retired..."}]}`. Use `/aq/data/` (startDate/endDate
+  `YYYY-MM-DDTHH` in UTC, `BBOX=west,south,east,north`, `parameters=PM25,OZONE,PM10`, `dataType=A`, `verbose=1` for
+  SiteName / FullAQSCode). Errors always come as a `WebServiceError` body, often with HTTP 200: the adapter raises
+  it (key messages -> skipped). Negative AQI (e.g. -999) means no data. Miami-Dade has only ~3 reporting monitors.
+- SIMULATED AQI sensors (`S.obs["demo_air"]`) are injected only when `DEMO_MODE=1` and neither `airnow` nor
+  `purpleair` is live, so adding a key removes them on the next refresh.
+- Status tab pill text comes from the adapter's SkipAdapter message: any `*_KEY` / `*_TOKEN` name in it is shown as
+  "needs <NAME>".

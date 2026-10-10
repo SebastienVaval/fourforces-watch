@@ -54,15 +54,15 @@ flowchart TB
 | Water | [NWS alerts](https://www.weather.gov/documentation/services-web-api) | no | flood / coastal flood / storm surge |
 | Air | [NHC CurrentStorms.json](https://www.nhc.noaa.gov/CurrentStorms.json) | no | active storms + distance to city |
 | Air | NWS alerts | no | wind / tropical / tornado / air quality |
-| Air | [EPA AirNow](https://docs.airnowapi.org/) | free key | official AQI |
-| Air | [PurpleAir](https://api.purpleair.com/) | key | neighborhood PM2.5 → AQI (EPA 2024 breakpoints, uncorrected) |
+| Air | [EPA AirNow](https://docs.airnowapi.org/) `/aq/data/` (bbox, last 3 h, `dataType=A`) | free key | official hourly AQI per monitor and pollutant (PM2.5, ozone, PM10) |
+| Air | [PurpleAir](https://api.purpleair.com/) v1 `/sensors` (outdoor, bbox) | key | neighborhood PM2.5 → AQI (US EPA correction, EPA 2024 breakpoints) |
 | Land | Miami-Dade GIS: [evacuation zones](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/HurricaneEvacZone_gdb/FeatureServer/0), [order flags](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationOrder/FeatureServer/0), [open shelters](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationCenterShelters_Open/FeatureServer/0) | no | zone per neighborhood; order flags shown as "confirm with official channels" |
 | Land | [OpenFEMA declarations](https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2) | no | active disaster declarations for the county |
 | Land | [USGS earthquakes](https://earthquake.usgs.gov/fdsnws/event/1/) | no | generic; for reuse in other cities |
 | Land | NWS alerts | no | evacuation / civil emergency |
 | Fire | NWS station KMIA + hourly forecast | no | heat index now + 12-hour forecast peak |
 | Fire | NWS alerts | no | heat advisory / extreme heat / red flag |
-| Fire | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/) | free key | satellite active-fire detections |
+| Fire | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/) VIIRS NOAA-20/21 + SNPP + MODIS | free key | satellite active-fire detections, last 48 h, Everglades edge included |
 | Land | [Miami-Dade County Open Data](https://gis-mdc.opendata.arcgis.com/): [hurricane evacuation bus pickups](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Hurricane_Bus_Stops/FeatureServer/0) (129), [hospitals](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Miami_Dade_Hospitals/FeatureServer/0) (37) | no | reference sites on the map (`county_gis_land`); never change a status |
 | Fire | Miami-Dade County Open Data: [fire stations](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FireStation_gdb/FeatureServer/0) (75), [cooling centers](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Cooling_Centers/FeatureServer/0) (65) | no | reference sites on the map (`county_gis_fire`); never change a status |
 
@@ -84,6 +84,51 @@ checked live on Oct 10, 2026.
 
 The county's pre-designated shelter list and the open-shelters layer are empty outside an activation; the open
 shelters layer is already polled by `evac_zones` and appears automatically when the county opens shelters.
+
+### Air force
+
+- **AQI sources:** EPA AirNow (official regulatory monitors via `/aq/data/`, latest hour per monitor and pollutant; the old
+  `observation/latLong/current` and `zipCode/current` services were retired on Oct 1, 2026) and PurpleAir outdoor sensors (neighborhood
+  scale). PurpleAir PM2.5 uses the US EPA correction `0.524 × PM2.5_cf1 − 0.0862 × RH + 5.75` when the sensor reports
+  humidity, else its uncorrected 10-minute average; sensors whose A/B channels disagree (`confidence` < 50) are dropped.
+  AQI uses the EPA 2024 PM2.5 breakpoints (Good ≤ 9.0 µg/m³).
+- **Neighborhood rule** (`air` in the city pack): the tile AQI is the median of sensors within `sensor_radius_km` (5);
+  each monitor counts with its worst pollutant; with no monitor or sensor near, the worst current AirNow reading in
+  the city applies. AQI ≥ `aqi_watch` (101, Unhealthy for Sensitive
+  Groups) is watch, ≥ `aqi_alert` (151, Unhealthy) is alert. NHC storms (watch within 800 km, alert within 300 km) and
+  NWS wind / tropical / air-quality alerts keep their own status.
+- **Hazard Board air tile:** AQI value, EPA category and source (e.g. "median of 3 PurpleAir sensors within 5 km"), and
+  the nearest NHC storm with its distance. Messages add an air-quality tip (limit outdoor activity, close windows,
+  mask for sensitive groups) only when AQI is the cause, and a storm tip when a storm is.
+- **Air view** (map side panel, 💨): only air layers, sensors in EPA category colors, NHC storm centers, legend, and the
+  state of each AQI feed.
+- **Keys** (both optional; the app runs without them and the adapters go live on the next refresh after you add them):
+  - `AIRNOW_API_KEY`: free, request at <https://docs.airnowapi.org/account/request/>.
+  - `PURPLEAIR_API_KEY`: a PurpleAir **read** key from <https://develop.purpleair.com/> (sign in, create a project, then
+    a read key; usage uses PurpleAir points).
+  The Status tab shows "needs AIRNOW_API_KEY" / "needs PURPLEAIR_API_KEY" until they are set.
+- **Dry-day demo:** with `DEMO_MODE=1` **and** both AQI feeds off, `air.demo_sensors` adds three **SIMULATED** sensors
+  (one Unhealthy for Sensitive Groups near Doral). Own source `demo_air`, `extra.simulated = true`, SIMULATED names and
+  headlines, dashed yellow rings, banner text. They disappear as soon as a real AQI feed is live.
+
+### Fire force
+
+- **Satellite hotspots:** NASA FIRMS (VIIRS NOAA-20, NOAA-21, S-NPP and MODIS, last 48 h) in `fire.firms.bbox`, which
+  reaches west to the Everglades. Confidence is normalised to low / nominal / high; popups show FRP (MW), sensor, pass
+  time and the nearest county fire station (straight-line km).
+- **Neighborhood rule** (`fire.hotspots` in the city pack): a detection of `min_confidence` (default nominal) or higher
+  within `alert_km` (5) of a tile is **alert**, within `watch_km` (15) **watch**; low-confidence or farther detections
+  are shown but do not count.
+- **Heat:** NWS heat index now and 12-hour forecast peak (watch ≥ 103 F, alert ≥ 108 F) plus NWS heat / red flag / fire
+  weather alerts.
+- **Hazard Board fire tile:** nearest fire station, the two nearest cooling centers and, when within `watch_km`, the
+  nearest hotspot (`fire.context`; county reference layers, information only). Messages add a fire/heat tip in EN/ES/HT
+  (templates; Grok writes them when `XAI_API_KEY` is set).
+- **Fire view** (map side panel, 🔥): shows only fire layers (hotspots, fire stations, cooling centers, urban heat island
+  overlay) with a legend and a live summary.
+- **Dry-day demo:** with `DEMO_MODE=1`, `fire.demo_hotspots` adds one **SIMULATED** hotspot (Everglades edge west of
+  Doral). It has its own source (`demo_fire`, never mixed into `nasa_firms`), `extra.simulated = true`, a SIMULATED
+  headline, a dashed yellow ring and popup tag, and is named in the page banner.
 
 ### Basemap: Mapbox (optional)
 

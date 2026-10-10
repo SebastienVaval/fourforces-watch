@@ -18,7 +18,7 @@
   </nav>
   <div class="meta"><span id="lastRefresh">loading…</span> <button id="refreshBtn" title="Refresh now">↻</button></div>
 </header>
-<div id="demoBanner" class="demo-banner hidden">DEMO / SIMULATED: some camera images are replaced with archived, openly licensed Miami flood photos (CC0, Wikimedia Commons) to show detection on a dry day. Grok still analyses them live.</div>
+<div id="demoBanner" class="demo-banner hidden">DEMO / SIMULATED: some camera images are replaced with archived, openly licensed Miami flood photos (CC0, Wikimedia Commons) to show detection on a dry day, plus one SIMULATED satellite fire hotspot and, while no AirNow/PurpleAir key is set, SIMULATED AQI sensors (dashed yellow rings). Grok still analyses the images live.</div>
 <main>
   <section id="tab-map" class="tabpane active">
     <div id="map"></div>
@@ -29,7 +29,12 @@
         <label><input type="checkbox" data-force="land" checked> <span class="f land">Land</span></label>
         <label><input type="checkbox" data-force="fire" checked> <span class="f fire">Fire</span></label>
         <label><input type="checkbox" id="onlyChecked"> checked cameras only</label>
+        <label><input type="checkbox" id="showRefs" checked> county sites</label>
+        <button id="airViewBtn" class="fireview airview" title="Show only air layers">💨 Air view</button>
+        <button id="fireViewBtn" class="fireview" title="Show only fire layers">🔥 Fire view</button>
       </div>
+      <div id="airBox" class="card hidden"></div>
+      <div id="fireBox" class="card hidden"></div>
       <div id="tideBox" class="card"></div>
       <div id="camSummary" class="card"></div>
       <h3>Area-wide alerts</h3>
