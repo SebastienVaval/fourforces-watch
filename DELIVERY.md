@@ -22,15 +22,15 @@ Live feed health is at `/api/status` and in the web UI's **Status** tab.
 | 15 | Status tab + `/api/status` (last fetch, last success, count, error) | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | |
 | 16 | Demo mode (CC0 2016 Miami flood photos, SIMULATED banner) + docs/DEMO.md | Done | Enrique | Oct 10 11:20 | [M0.3](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Rehearse the 2-minute script |
 | 17 | Deploy config (Dockerfile, render.yaml, HF Space header) | Done | Enrique | Oct 10 11:20 | [M0.6](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Config only |
-| 18 | Live demo URL (deployed) | Not started | Enrique | — | [M0.6](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Deploy per DEPLOY.md; set `XAI_API_KEY` as a secret |
+| 18 | Live demo URL (deployed) | Not started | Enrique | Oct 10 11:50 | [M0.6](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Render (render.yaml) or HF Space (Dockerfile) per DEPLOY.md, `DEMO_MODE=1`; key optional |
 | 19 | Backup demo video | Done | Enrique | Oct 10 11:35 | [M0.3](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | 115 s, 1280×720, captions; recorded by `scripts/record_demo.py` (kept outside the repo) |
-| 20 | Public GitHub repo (MIT) | Not started | Sébastien | — | [M0.5](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Personal account; never commit `.env` |
+| 20 | Public GitHub repo (MIT) | Done | Sébastien | Oct 10 11:50 | [M0.5](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | https://github.com/SebastienVaval/fourforces-watch, all branches, no `.env` |
 | 21 | README | Done | Sébastien | Oct 10 11:20 | [M0.1](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Add live URL + video link once available |
 | 22 | OrganizerHQ submission | Not started | Sébastien | — | [M0.7](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Shortlist ~4:00 PM, deadline 4:30 PM ET |
 | 23 | ROADMAP.md (public): numbered milestones | Done | Sébastien | Oct 10 11:40 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Merged from docs/roadmap |
 | 24 | Cursor project rules `.cursor/rules/fourforces.mdc` | Done | Sébastien | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Adapter interface, schema, no secrets, tests, no proprietary content |
 | 25 | `AGENTS.md` (guidance for AI coding agents) | Done | Sébastien | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Same rules as Cursor |
-| 26 | CI workflow `.github/workflows/tests.yml` (pytest on push/PR) | In progress | Enrique | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | File committed; first green run after the GitHub push |
+| 26 | CI workflow `.github/workflows/tests.yml` (pytest on push/PR) | Done | Enrique | Oct 10 11:58 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Green on GitHub after two fixes (install pytest; `pytest.ini` pythonpath) |
 | 27 | Feature branches (water, air, land, fire, dashboard, demo, docs/roadmap) | Done | Sébastien | Oct 10 11:26 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | `main` = integrated app |
 
 Owners are the planned split. Edit them as the team decides.
