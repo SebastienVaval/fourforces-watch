@@ -30,7 +30,7 @@ Live feed health is at `/api/status` and in the web UI's **Status** tab.
 | 23 | ROADMAP.md (public): numbered milestones | Done | Sébastien | Oct 10 11:40 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Merged from docs/roadmap |
 | 24 | Cursor project rules `.cursor/rules/fourforces.mdc` | Done | Sébastien | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Adapter interface, schema, no secrets, tests, no proprietary content |
 | 25 | `AGENTS.md` (guidance for AI coding agents) | Done | Sébastien | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Same rules as Cursor |
-| 26 | CI workflow `.github/workflows/tests.yml` (pytest on push/PR) | In progress | Enrique | Oct 10 11:38 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | First run failed (pytest not installed); fixed: `pip install -r requirements.txt pytest` |
+| 26 | CI workflow `.github/workflows/tests.yml` (pytest on push/PR) | Done | Enrique | Oct 10 11:58 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | Green on GitHub after two fixes (install pytest; `pytest.ini` pythonpath) |
 | 27 | Feature branches (water, air, land, fire, dashboard, demo, docs/roadmap) | Done | Sébastien | Oct 10 11:26 | [M0.4](ROADMAP.md#phase-0-hackathon-build-sat-oct-10-2026-build-1100-am330-pm-et) | `main` = integrated app |
 
 Owners are the planned split. Edit them as the team decides.
