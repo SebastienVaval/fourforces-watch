@@ -2,7 +2,20 @@
 
 Open items only. Finished work is recorded in [DELIVERY.md](DELIVERY.md). Order and timing are in [PLAN.md](PLAN.md).
 
-_Last updated: Sat Oct 10, 2026, 12:00 PM ET._
+_Last updated: Sat Oct 10, 2026, 12:22 PM ET._
+
+## Next hour: 12:22 PM to 1:22 PM ET (Sat Oct 10)
+
+All work goes on `dev_seb` (Sébastien) or `dev`. Merge into `dev` when done. `main` is not touched until the 3:45 PM freeze (M0.8).
+
+- [ ] **12:22 PM to 1:00 PM: deploy the live demo** (M0.6, Enrique). Use Render from `render.yaml`, or an HF Space from the `Dockerfile`, with `DEMO_MODE=1` and `CONTACT` set. Put `XAI_API_KEY` in host secrets only. Done when the public URL loads the map, the board and `/api/status`.
+- [ ] **12:22 PM to 1:00 PM: live Grok run** (M0.2, Sébastien). Create the xAI key and set it in a local `.env`, not committed. Classify one demo camera and one real camera, and get one board message written by Grok. Done when `/api/status` shows `cameras_checked` above 0 and a message is not `by: template`. Also confirm the model ids in `.env.example` are accepted.
+- [ ] **12:40 PM to 1:00 PM: upload the demo video** (115 s, recorded at 11:35 AM) to YouTube (unlisted) or Drive, and get a shareable link (Sébastien).
+- [ ] **1:00 PM to 1:22 PM: check the deployed URL** (Enrique). The SIMULATED banner shows, there are 5 demo cameras and 10 board tiles, and `/healthz` responds. The host can reach Wikimedia Commons.
+- [ ] **1:00 PM to 1:22 PM: README header** (Enrique). Replace the live URL and video placeholders. Remove Vercel from the pipeline diagram (housekeeping item below).
+- [ ] **1:00 PM to 1:22 PM: statuses**. In ROADMAP, update M0.2 and M0.6. In DELIVERY, update rows 7, 9, 18 and 21, but only for what is verified.
+- [ ] **Fallback at 1:22 PM**: if the deploy is not up, demo from `localhost` with `DEMO_MODE=1` and use the video. Do not block the 1:30 PM rehearsal.
+- [x] **Fix in MEMORY.md**: the branches line still says work goes to `main`. The rule now is: work on `dev` or `dev_seb`, and merge `dev` into `main` and tag `v0.1` at the 3:45 PM freeze.
 
 ## Now: before the 4:00 PM ET shortlist (hard deadline 4:30 PM)
 

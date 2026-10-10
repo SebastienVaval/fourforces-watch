@@ -3,15 +3,17 @@
 Facts about this project that are easy to forget and slow to rediscover. Not a changelog (that is git) and not a
 status board (that is [DELIVERY.md](DELIVERY.md)). Plan: [PLAN.md](PLAN.md). Open items: [TO-DO.md](TO-DO.md).
 
-_Last updated: Sat Oct 10, 2026, 12:00 PM ET._
+_Last updated: Sat Oct 10, 2026, 12:23 PM ET._
 
 ## Context
 
 - Built at Hack for Humanity Miami, The LAB Miami, Oct 10, 2026. Track 04 Data to Action (secondary: 01 Four Forces, water).
 - Clock (ET): build 11:00 AM–3:30 PM · shortlist ~4:00 PM · hard submission deadline 4:30 PM.
 - Team: Sébastien Vaval, Enrique Escobar. Repo: https://github.com/SebastienVaval/fourforces-watch (public, MIT).
-- Branches: `main` is always the integrated, working app; no force-pushes. Work goes on `feature/*` or `docs/*`,
-  tests run, then merge. `dev` holds the planning files.
+- Branches: all work is done on `dev`, not `main`. Personal branches (`dev_seb`) and `feature/*` / `docs/*` branch
+  from `dev`, tests run, then merge into `dev`. No force-pushes. `main` stays untouched until the 3:45 PM ET
+  submission freeze (M0.8), when `dev` is merged into `main` and tagged `v0.1`; after that, `main` changes only at a
+  release tag.
 
 ## How the app works
 
