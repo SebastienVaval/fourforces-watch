@@ -85,6 +85,22 @@ checked live on Oct 10, 2026.
 The county's pre-designated shelter list and the open-shelters layer are empty outside an activation; the open
 shelters layer is already polled by `evac_zones` and appears automatically when the county opens shelters.
 
+### Water force
+
+- **Sources:** FL511 cameras (Grok water-on-road check), NOAA CO-OPS tide at Virginia Key 8723214 (level, anomaly vs
+  prediction, rising/falling trend, next high tide projected with today's excess), USGS NWIS canal gauges (3-hour rise),
+  NWS flood / coastal flood / storm surge alerts, and the FEMA flood zone (FIRM) at each neighborhood from Miami-Dade
+  County Open Data (`water.flood_zones`).
+- **Neighborhood rule:** camera water on road (≥ 60% confidence = alert, else watch); tide ≥ `watch_ft` = watch and ≥
+  `minor_flood_ft` = alert, or a projected next high above minor flood = watch, **coastal zones only**; USGS gauge
+  rising ≥ `rapid_rise_ft_3h` within `nearby_km` = watch (per-site `site_thresholds` optional); NWS flood alerts by zone.
+  The FEMA zone is context only.
+- **Hazard Board water tile:** FEMA zone with plain meaning, tide now + trend + next high (coastal tiles), nearest
+  camera verdict (prefers a wet one, then a checked one, within `camera_radius_km`), nearest canal gauge. The
+  "avoid flooded roads" tip appears only when water is watch/alert.
+- **Water view** (🌊): only water layers, cameras by verdict, tide and gauges, FEMA VE + canals overlays, legend.
+- Without `XAI_API_KEY` cameras stay "not checked" and the rest of the water force runs.
+
 ### Air force
 
 - **AQI sources:** EPA AirNow (official regulatory monitors via `/aq/data/`, latest hour per monitor and pollutant; the old
