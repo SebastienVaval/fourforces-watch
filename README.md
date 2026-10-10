@@ -54,8 +54,8 @@ flowchart TB
 | Water | [NWS alerts](https://www.weather.gov/documentation/services-web-api) | no | flood / coastal flood / storm surge |
 | Air | [NHC CurrentStorms.json](https://www.nhc.noaa.gov/CurrentStorms.json) | no | active storms + distance to city |
 | Air | NWS alerts | no | wind / tropical / tornado / air quality |
-| Air | [EPA AirNow](https://docs.airnowapi.org/) | free key | official AQI |
-| Air | [PurpleAir](https://api.purpleair.com/) | key | neighborhood PM2.5 → AQI (EPA 2024 breakpoints, uncorrected) |
+| Air | [EPA AirNow](https://docs.airnowapi.org/) `/aq/observation/latLong/current/` | free key | official AQI per pollutant for the reporting area |
+| Air | [PurpleAir](https://api.purpleair.com/) v1 `/sensors` (outdoor, bbox) | key | neighborhood PM2.5 → AQI (US EPA correction, EPA 2024 breakpoints) |
 | Land | Miami-Dade GIS: [evacuation zones](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/HurricaneEvacZone_gdb/FeatureServer/0), [order flags](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationOrder/FeatureServer/0), [open shelters](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationCenterShelters_Open/FeatureServer/0) | no | zone per neighborhood; order flags shown as "confirm with official channels" |
 | Land | [OpenFEMA declarations](https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2) | no | active disaster declarations for the county |
 | Land | [USGS earthquakes](https://earthquake.usgs.gov/fdsnws/event/1/) | no | generic; for reuse in other cities |
@@ -84,6 +84,30 @@ checked live on Oct 10, 2026.
 
 The county's pre-designated shelter list and the open-shelters layer are empty outside an activation; the open
 shelters layer is already polled by `evac_zones` and appears automatically when the county opens shelters.
+
+### Air force
+
+- **AQI sources:** EPA AirNow (official, area-wide, one AQI per pollutant) and PurpleAir outdoor sensors (neighborhood
+  scale). PurpleAir PM2.5 uses the US EPA correction `0.524 × PM2.5_cf1 − 0.0862 × RH + 5.75` when the sensor reports
+  humidity, else its uncorrected 10-minute average; sensors whose A/B channels disagree (`confidence` < 50) are dropped.
+  AQI uses the EPA 2024 PM2.5 breakpoints (Good ≤ 9.0 µg/m³).
+- **Neighborhood rule** (`air` in the city pack): the tile AQI is the median of sensors within `sensor_radius_km` (5);
+  with no sensor near, the AirNow area AQI (worst pollutant) applies. AQI ≥ `aqi_watch` (101, Unhealthy for Sensitive
+  Groups) is watch, ≥ `aqi_alert` (151, Unhealthy) is alert. NHC storms (watch within 800 km, alert within 300 km) and
+  NWS wind / tropical / air-quality alerts keep their own status.
+- **Hazard Board air tile:** AQI value, EPA category and source (e.g. "median of 3 PurpleAir sensors within 5 km"), and
+  the nearest NHC storm with its distance. Messages add an air-quality tip (limit outdoor activity, close windows,
+  mask for sensitive groups) only when AQI is the cause, and a storm tip when a storm is.
+- **Air view** (map side panel, 💨): only air layers, sensors in EPA category colors, NHC storm centers, legend, and the
+  state of each AQI feed.
+- **Keys** (both optional; the app runs without them and the adapters go live on the next refresh after you add them):
+  - `AIRNOW_API_KEY`: free, request at <https://docs.airnowapi.org/account/request/>.
+  - `PURPLEAIR_API_KEY`: a PurpleAir **read** key from <https://develop.purpleair.com/> (sign in, create a project, then
+    a read key; usage uses PurpleAir points).
+  The Status tab shows "needs AIRNOW_API_KEY" / "needs PURPLEAIR_API_KEY" until they are set.
+- **Dry-day demo:** with `DEMO_MODE=1` **and** both AQI feeds off, `air.demo_sensors` adds three **SIMULATED** sensors
+  (one Unhealthy for Sensitive Groups near Doral). Own source `demo_air`, `extra.simulated = true`, SIMULATED names and
+  headlines, dashed yellow rings, banner text. They disappear as soon as a real AQI feed is live.
 
 ### Fire force
 

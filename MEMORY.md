@@ -3,7 +3,7 @@
 Facts about this project that are easy to forget and slow to rediscover. Not a changelog (that is git) and not a
 status board (that is [DELIVERY.md](DELIVERY.md)). Plan: [PLAN.md](PLAN.md). Open items: [TO-DO.md](TO-DO.md).
 
-_Last updated: Sat Oct 10, 2026, 2:15 PM ET._
+_Last updated: Sat Oct 10, 2026, 2:40 PM ET._
 
 ## Context
 
@@ -94,3 +94,14 @@ _Last updated: Sat Oct 10, 2026, 2:15 PM ET._
   and is empty when `DEMO_MODE` is off.
 - Fire view in the dashboard turns off the non-fire overlays and restores them on exit; the heat-island overlay id is
   hard-coded as `mdc_heat_islands` in `web/app.js`.
+- Air tile AQI is computed once per board in `forces/air.annotate` (module cache `_TILE`), then used by
+  `relevant` / `status_for` / `context`. Sensors = `extra.kind == "aqi_sensor"` (PurpleAir, demo); area AQI =
+  `kind == "aqi_area"` (AirNow) and only counts for a tile with no sensor within `sensor_radius_km`.
+- PurpleAir: `X-API-Key` header, `location_type=0`, bbox `nwlng/nwlat/selng/selat`. The EPA correction needs
+  `pm2.5_cf_1` + `humidity`; the 10-minute average is the fallback. A 401/403 is reported as skipped, not an error.
+- AirNow `latLong/current` returns one row per pollutant with local `DateObserved` + `HourObserved` + `LocalTimeZone`
+  (EST/EDT); `AQI = -1` means no data. 401 + "Invalid API key" for a bad key.
+- SIMULATED AQI sensors (`S.obs["demo_air"]`) are injected only when `DEMO_MODE=1` and neither `airnow` nor
+  `purpleair` is live, so adding a key removes them on the next refresh.
+- Status tab pill text comes from the adapter's SkipAdapter message: any `*_KEY` / `*_TOKEN` name in it is shown as
+  "needs <NAME>".
