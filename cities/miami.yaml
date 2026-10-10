@@ -24,6 +24,12 @@ water:
     parameter_cd: "00065"    # gauge height, ft
     rapid_rise_ft_3h: 0.5    # generic watch rule: rise faster than this over 3 h
     site_thresholds: {}      # optional {site_no: {watch: x, alert: y}}
+  flood_zones:               # FEMA FIRM zone at each neighborhood point (context only, never a status)
+    layer: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FEMAFloodZone_gdb/FeatureServer/0
+    field: FZONE
+  context:                   # Hazard Board water tile
+    camera_radius_km: 3      # nearest checked camera within this distance
+    gauge_radius_km: 10      # nearest USGS canal gauge within this distance
 
 air:
   airnow: {parameters: "PM25,OZONE,PM10", hours: 3}   # /aq/data/ monitors in bbox, latest hour each

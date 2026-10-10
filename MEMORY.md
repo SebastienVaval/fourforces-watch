@@ -3,7 +3,7 @@
 Facts about this project that are easy to forget and slow to rediscover. Not a changelog (that is git) and not a
 status board (that is [DELIVERY.md](DELIVERY.md)). Plan: [PLAN.md](PLAN.md). Open items: [TO-DO.md](TO-DO.md).
 
-_Last updated: Sat Oct 10, 2026, 2:40 PM ET._
+_Last updated: Sat Oct 10, 2026, 3:20 PM ET._
 
 ## Context
 
@@ -125,3 +125,9 @@ _Last updated: Sat Oct 10, 2026, 2:40 PM ET._
   `purpleair` is live, so adding a key removes them on the next refresh.
 - Status tab pill text comes from the adapter's SkipAdapter message: any `*_KEY` / `*_TOKEN` name in it is shown as
   "needs <NAME>".
+- Water tile context comes from `forces/water.context`; FEMA zones come from `adapters/water/flood_zones.py`
+  (point query per neighborhood, cached 24 h, `extra.reference`, excluded from status, hidden on the map).
+  Several polygons can touch a point; the most hazardous zone (VE > AE > ... > X) is reported.
+- NWS alert observations all use source `nws_alerts` (the `nws_*` adapters are wrappers); filter by `force`, not by
+  adapter name, in the UI.
+- USGS `site_thresholds` is empty for Miami-Dade: only the 3-hour rapid-rise rule can raise a gauge status today.

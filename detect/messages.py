@@ -53,8 +53,20 @@ Facts from public sensors and official alerts:
 
 Write ONE plain-language message, at most 2 short sentences (max 35 words): what is going on and one practical
 thing to do. Do not invent facts, numbers or places. If everything is ok, say so briefly. Point to official
-channels for decisions; never give evacuation orders yourself.
+channels for decisions; never give evacuation orders yourself. Facts starting with SIMULATED are demo data, not
+real conditions: do not present them as real.
 Return ONLY JSON, no markdown: {{"en": "...", "es": "...", "ht": "..."}} (es = Spanish, ht = Haitian Creole)."""
+
+
+# Prefix added to every message built from at least one SIMULATED fact (demo mode), in all three languages.
+DEMO_PREFIX = {"en": "[SIMULATED demo] ", "es": "[Demo SIMULADA] ", "ht": "[Demo SIMILE] "}
+
+
+def _label_simulated(msg: dict, facts: list[str]) -> dict:
+    if not any("SIMULATED" in str(f) for f in facts):
+        return msg
+    return msg | {k: (msg[k] if msg[k].startswith(DEMO_PREFIX[k]) else DEMO_PREFIX[k] + msg[k]) for k in DEMO_PREFIX} \
+        | {"simulated": True}
 
 
 def _template(name, overall, statuses, tips=None):
@@ -83,11 +95,11 @@ def neighborhood_message(city_name: str, name: str, overall: str, statuses: dict
                 city=city_name, name=name, statuses=json.dumps(statuses),
                 facts="\n".join(f"- {f}" for f in facts[:8]) or "- none"), max_tokens=400))
             if j and all(k in j for k in ("en", "es", "ht")):
-                msg = {k: str(j[k])[:300] for k in ("en", "es", "ht")} | {"by": grok.text_model()}
+                msg = _label_simulated({k: str(j[k])[:300] for k in ("en", "es", "ht")} | {"by": grok.text_model()}, facts)
         except Exception as e:
             log.warning("grok message failed for %s: %s", name, e)
     if msg is None:
-        msg = _template(name, overall, statuses, tips) | {"by": "template"}
+        msg = _label_simulated(_template(name, overall, statuses, tips) | {"by": "template"}, facts)
         if have_ai:
             return msg  # don't cache the fallback; retry Grok next refresh
     _cache[key] = msg
