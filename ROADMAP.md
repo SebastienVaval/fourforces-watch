@@ -20,9 +20,17 @@ Day-to-day tracking is in [DELIVERY.md](DELIVERY.md), and each delivery row link
 | **M0.4** | Development pipeline | `.cursor/rules/fourforces.mdc`, `AGENTS.md`, feature branches, GitHub Actions `pytest` | rules + AGENTS.md committed; branches exist; workflow file committed (green run once on GitHub) | Oct 10, 12:00 PM | **Done** (verified 11:58 AM: CI green on GitHub main) |
 | **M0.5** | Public repository | public GitHub repo (MIT), all branches pushed, no secrets | repo is public and browsable; `.env` absent; README renders | Oct 10, 12:30 PM | **Done** (verified 11:50 AM: public, MIT, all branches, no `.env`) |
 | **M0.6** | Live demo link | deployed instance with `DEMO_MODE=1`, no key needed | public URL loads the map, board and `/api/status` | Oct 10, 3:00 PM | **Planned**: Vercel serverless not a fit as-is; deploy the container on Render or an HF Space (DEPLOY.md) |
+| **M0.8** | Submission freeze and public release | merge `dev` into `main`, tag `v0.1` on `main` | `main` equals `dev` at the freeze; tag `v0.1` is published on GitHub; CI is green on `main` | Oct 10, 3:45 PM | Planned |
 | **M0.7** | Submission | project page: description, repo, live link, video, track 04 Data to Action | submitted before the shortlist (~4:00 PM ET); hard deadline 4:30 PM ET | Oct 10, 4:00 PM | **Planned** |
 
-**Phase 0 gate:** M0.1, M0.3, M0.5, M0.6 and M0.7 are Done.
+**Phase 0 gate:** M0.1, M0.3, M0.5, M0.6, M0.8 and M0.7 are Done.
+
+## Branching policy
+
+- All work happens on `dev`: code, docs, the city template, adapters, the API, the dashboard and packaging. Every step from 10:45 AM ET on Oct 10 is done on `dev`.
+- Feature branches (`feature/*`, `docs/*`, `chore/*`) branch from `dev` and merge back into `dev`.
+- `main` stays untouched until the submission freeze at 3:45 PM ET (M0.8). At the freeze, `dev` is merged into `main` and `main` is tagged `v0.1` for the public release.
+- After the freeze, the same rule applies: work on `dev`, merge into `main` only at a release tag.
 
 ## Phase 1: Cleanup and a second city → v0.2 (Oct 12–23)
 
