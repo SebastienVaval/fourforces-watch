@@ -395,6 +395,7 @@ async function load() {
   STATUS = s; OBS = o; BOARD = b;
   document.getElementById('cityName').textContent = s.city.name;
   document.getElementById('demoBanner').classList.toggle('hidden', !s.demo_mode);
+  document.getElementById('bannerAqi').classList.toggle('hidden', !o.some(x => x.source === 'demo_air'));
   document.getElementById('lastRefresh').textContent = s.last_refresh ? 'updated ' + fmt(s.last_refresh) : 'first refresh running…';
   if (first && s.city.center) map.setView(s.city.center, s.city.zoom || 10);
   renderMap(); renderSide(); renderBoard(); renderFeeds(); renderFire(); renderAir(); renderWater();
