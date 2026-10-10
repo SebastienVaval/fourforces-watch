@@ -44,11 +44,101 @@ land:
     # Order flags are shown as 'watch - confirm with official channels' unless true.
     trust_orders: false
 
+  # Reference sites from Miami-Dade County Open Data (ArcGIS Hub). Shown on the map, never change a tile status.
+  county_gis:
+    - id: mdc_evac_bus_pickup
+      name: Hurricane evacuation bus pickup point
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Hurricane_Bus_Stops/FeatureServer/0
+      fields: FACILITY,ADDRESS,CITY,EVACZONE,ACTIVE
+      label_field: FACILITY
+      measurement: evacuation_bus_pickup
+      link: https://www.miamidade.gov/global/emergency/hurricane/home.page
+    - id: mdc_hospitals
+      name: Hospital
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Miami_Dade_Hospitals/FeatureServer/0
+      fields: NAME,ADDRESS,CITY,BED,PHONE
+      label_field: NAME
+      measurement: hospital
+
 fire:
   nws_station: KMIA          # Miami International Airport
   heat_index_watch_f: 103
   heat_index_alert_f: 108
   firms: {source: VIIRS_SNPP_NRT, days: 1}
+  county_gis:
+    - id: mdc_fire_stations
+      name: Fire station (Miami-Dade Fire Rescue)
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FireStation_gdb/FeatureServer/0
+      fields: NAME,ADDRESS,CITY,TYPE
+      label_field: NAME
+      measurement: fire_station
+    - id: mdc_cooling_centers
+      name: Cooling center (extreme heat)
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Cooling_Centers/FeatureServer/0
+      fields: Name,Street,City_1,Type,OperationalHours,PhoneNumbe
+      label_field: Name
+      measurement: cooling_center
+
+# Public open-data portal (ArcGIS Hub). Generic code in core/arcgis.py; any Hub city only edits this block.
+open_data:
+  portal: https://gis-mdc.opendata.arcgis.com/
+  attribution: Miami-Dade County Open Data
+  # Map overlays served at /api/overlays/<id> (GeoJSON, cached 6 h). simplify = maxAllowableOffset in degrees.
+  overlays:
+    - id: mdc_surge_zones
+      name: Storm surge planning / evacuation zones A-E
+      force: land
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/StormSurgePlanningZone_Multipart/FeatureServer/0
+      where: "ZONEID <> 'N'"
+      fields: ZONEID
+      label_field: ZONEID
+      simplify: 0.0005
+      style_field: ZONEID
+      styles: {A: "#dc2626", B: "#f97316", C: "#facc15", D: "#22c55e", E: "#3b82f6"}
+      default: true
+    - id: mdc_evac_routes
+      name: Primary evacuation routes
+      force: land
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/PrimaryEvacuationRoute_gdb/FeatureServer/0
+      fields: SN
+      label_field: SN
+      simplify: 0.0005
+      color: "#e879f9"
+    - id: mdc_fema_ve
+      name: FEMA flood zone VE (coastal high hazard)
+      force: water
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FEMAFloodZone_VEView/FeatureServer/0
+      fields: FZONE,ELEV
+      label_field: FZONE
+      simplify: 0.0005
+      page_size: 100          # this layer's maxRecordCount
+      color: "#0ea5e9"
+    - id: mdc_fema_ae
+      name: FEMA flood zone AE (1% annual chance)
+      force: water
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FEMAFloodZone_AEView/FeatureServer/0
+      fields: FZONE,ELEV
+      label_field: FZONE
+      simplify: 0.001
+      page_size: 100
+      color: "#38bdf8"
+    - id: mdc_canals
+      name: Canals
+      force: water
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Canal_gdb/FeatureServer/0
+      fields: NAME,TYPE,MAINTBY
+      label_field: NAME
+      simplify: 0.0005
+      color: "#22d3ee"
+    - id: mdc_heat_islands
+      name: Urban heat island effect by census tract (deg F)
+      force: fire
+      url: https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Urban_Heat_Islands/FeatureServer/0
+      fields: urban_heat_island_effect_F,TRACT_FIPS,POPULATION
+      label_field: urban_heat_island_effect_F
+      simplify: 0.0005
+      style_field: urban_heat_island_effect_F
+      ramp: [[0, "#fde68a"], [8, "#fb923c"], [10, "#ef4444"], [12, "#991b1b"]]
 
 nws:
   point: [25.77, -80.19]

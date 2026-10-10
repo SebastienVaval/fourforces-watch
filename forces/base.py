@@ -6,7 +6,10 @@ from core.schema import Observation, haversine_km
 
 def applies_to(o: Observation, hood: dict, city: dict) -> bool:
     """Neighborhood-tagged items match by id; area-wide items match when their zone
-    list is empty or contains the tile's zone; point items match within nearby_km."""
+    list is empty or contains the tile's zone; point items match within nearby_km. Reference sites
+    (extra.reference: fire stations, hospitals, cooling centers...) are map context only and never count."""
+    if o.extra.get("reference"):
+        return False
     if o.extra.get("neighborhood"):
         return o.extra["neighborhood"] == hood["id"]
     if o.extra.get("scope") == "area":
