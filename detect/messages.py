@@ -27,9 +27,16 @@ TEMPLATES = {
     "watch": {"en": "Stay alert in {name}: {forces}. Check official updates.",
               "es": "Manténgase atento en {name}: {forces}. Revise los avisos oficiales.",
               "ht": "Rete vijilan nan {name}: {forces}. Swiv enfòmasyon ofisyèl yo."},
-    "alert": {"en": "Hazard in {name}: {forces}. Avoid flooded roads and follow official instructions.",
-              "es": "Peligro en {name}: {forces}. Evite calles inundadas y siga las instrucciones oficiales.",
-              "ht": "Danje nan {name}: {forces}. Pa pase nan lari ki inonde epi swiv enstriksyon ofisyèl yo."},
+    "alert": {"en": "Hazard in {name}: {forces}. Follow official instructions.",
+              "es": "Peligro en {name}: {forces}. Siga las instrucciones oficiales.",
+              "ht": "Danje nan {name}: {forces}. Swiv enstriksyon ofisyèl yo."},
+}
+# One practical tip per force in watch/alert, appended to the template message.
+TIPS = {
+    "water": {"en": "Avoid flooded roads.", "es": "Evite calles inundadas.", "ht": "Pa pase nan lari ki inonde."},
+    "fire": {"en": "Drink water, limit time outdoors, use a cooling center; report any new fire or smoke to 911.",
+             "es": "Tome agua, limite el tiempo al aire libre, use un centro de enfriamiento; reporte fuego o humo al 911.",
+             "ht": "Bwè dlo, pa rete twò lontan deyò, ale nan yon sant refwadisman; rapòte nenpòt dife oswa lafimen bay 911."},
 }
 
 PROMPT = """You write very short public-safety notices for residents of {city}.
@@ -50,6 +57,8 @@ def _template(name, overall, statuses):
         forces = ", ".join(WORDS[lang][f] for f, s in statuses.items() if s in ("watch", "alert"))
         key = overall if overall in TEMPLATES and forces else "ok"
         out[lang] = TEMPLATES[key][lang].format(name=name, forces=forces)
+        if key != "ok":
+            out[lang] += "".join(" " + TIPS[f][lang] for f, s in statuses.items() if s in ("watch", "alert") and f in TIPS)
     return out
 
 

@@ -133,6 +133,8 @@ def refresh():
                                                    "doc": (mod.__doc__ or "").strip().splitlines()[0]}
                 if res is not None:
                     S.obs[mod.NAME] = res
+        with S.lock:  # simulated hotspots live under their own key, never inside nasa_firms
+            S.obs["demo_fire"] = demo_mode.fire_hotspots(S.city) if demo_mode.enabled() else []
         cams = S.cameras()
         demo_cams = demo_mode.apply(cams, S.city) if demo_mode.enabled() else []
         for cam in cams:
@@ -149,6 +151,10 @@ def refresh():
         for t in tiles:
             statuses = {f: v["status"] for f, v in t["forces"].items()}
             facts = [r for v in t["forces"].values() for r in v["reasons"]]
+            ctx = t["forces"]["fire"].get("context") or {}
+            if t["forces"]["fire"]["status"] in ("watch", "alert") and ctx.get("cooling_centers"):
+                cc = ctx["cooling_centers"][0]
+                facts.append(f"Nearest cooling center: {cc['name']} ({cc['km']} km)")
             t["message"] = messages.neighborhood_message(S.city["name"], t["name"], t["status"], statuses, facts)
         with S.lock:
             S.board, S.last_refresh = tiles, utcnow_iso()

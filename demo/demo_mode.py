@@ -78,3 +78,26 @@ def apply(cameras: list[Observation], city: dict) -> list[Observation]:
                           "image_page": img["page"]})
         chosen.append(cam)
     return chosen
+
+
+def fire_hotspots(city: dict) -> list[Observation]:
+    """SIMULATED satellite fire detections from the city pack (``fire.demo_hotspots``) for a dry-day demo.
+
+    Own source name (``demo_fire``) so they never mix with real NASA FIRMS data, and labelled SIMULATED in
+    ``extra.simulated``, the headline, the map popup and the page banner.
+    """
+    from core.schema import Place, utcnow_iso
+    out = []
+    for i, h in enumerate((city.get("fire") or {}).get("demo_hotspots") or []):
+        conf = h.get("confidence", "nominal")
+        out.append(Observation(
+            force="fire", source="demo_fire",
+            place=Place(id=f"sim-fire-{i}", name=f"SIMULATED fire detection: {h.get('name', 'demo')}",
+                        lat=float(h["lat"]), lon=float(h["lon"])),
+            time=utcnow_iso(), measurement="active_fire", value=float(h.get("frp", 10.0)), unit="MW FRP",
+            threshold="detection within watch_km", status="alert" if conf == "high" else "watch",
+            extra={"kind": "hotspot", "simulated": True, "confidence": conf, "product": "SIMULATED",
+                   "headline": f"SIMULATED: satellite fire detection near {h.get('name', 'demo')} ({conf} confidence)",
+                   "note": "Demo only (DEMO_MODE=1). Not a real detection; real ones come from NASA FIRMS."},
+        ))
+    return out
