@@ -2,7 +2,7 @@
 
 Open items only. Finished work is recorded in [DELIVERY.md](DELIVERY.md). Order and timing are in [PLAN.md](PLAN.md).
 
-_Last updated: Sat Oct 10, 2026, 1:40 PM ET._
+_Last updated: Sat Oct 10, 2026, 2:15 PM ET._
 
 ## Now: before the 4:00 PM ET shortlist (hard deadline 4:30 PM)
 
@@ -27,6 +27,8 @@ Branch rule: work on `dev_seb` / `dev_enrique` and merge into `dev`. `dev` is me
 - [ ] Render: add `MAPBOX_TOKEN` (public pk. token) and `FIRMS_MAP_KEY` as secret env vars (both `sync: false` in
       `render.yaml`). Without `MAPBOX_TOKEN` the map falls back to OSM/CARTO tiles.
 - [ ] Demo: open the map's layer control (top left) and show the evacuation zones + FEMA VE overlays with a camera.
+- [x] Fire force (M0.9, DELIVERY rows 31–34) on `dev_seb`: FIRMS 4 sensors, hotspot rule, nearest station/cooling, Fire view, SIMULATED hotspot.
+- [ ] Demo script (`docs/DEMO.md`): add a 15 s fire beat: 🔥 Fire view → SIMULATED hotspot popup (nearest station) → Doral tile.
 - [ ] **Live Grok run** (M0.2, S├®bastien): with `XAI_API_KEY` set, confirm a camera is classified and a board
       message is Grok-written. Confirm the default model ids in `.env.example` are accepted by the API.
 - [ ] Upload the 115 s demo video (unlisted YouTube or Drive) and get a shareable link (Sébastien).

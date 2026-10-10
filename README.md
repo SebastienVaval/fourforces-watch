@@ -62,7 +62,7 @@ flowchart TB
 | Land | NWS alerts | no | evacuation / civil emergency |
 | Fire | NWS station KMIA + hourly forecast | no | heat index now + 12-hour forecast peak |
 | Fire | NWS alerts | no | heat advisory / extreme heat / red flag |
-| Fire | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/) | free key | satellite active-fire detections |
+| Fire | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/) VIIRS NOAA-20/21 + SNPP + MODIS | free key | satellite active-fire detections, last 48 h, Everglades edge included |
 | Land | [Miami-Dade County Open Data](https://gis-mdc.opendata.arcgis.com/): [hurricane evacuation bus pickups](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Hurricane_Bus_Stops/FeatureServer/0) (129), [hospitals](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Miami_Dade_Hospitals/FeatureServer/0) (37) | no | reference sites on the map (`county_gis_land`); never change a status |
 | Fire | Miami-Dade County Open Data: [fire stations](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/FireStation_gdb/FeatureServer/0) (75), [cooling centers](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/Cooling_Centers/FeatureServer/0) (65) | no | reference sites on the map (`county_gis_fire`); never change a status |
 
@@ -84,6 +84,25 @@ checked live on Oct 10, 2026.
 
 The county's pre-designated shelter list and the open-shelters layer are empty outside an activation; the open
 shelters layer is already polled by `evac_zones` and appears automatically when the county opens shelters.
+
+### Fire force
+
+- **Satellite hotspots:** NASA FIRMS (VIIRS NOAA-20, NOAA-21, S-NPP and MODIS, last 48 h) in `fire.firms.bbox`, which
+  reaches west to the Everglades. Confidence is normalised to low / nominal / high; popups show FRP (MW), sensor, pass
+  time and the nearest county fire station (straight-line km).
+- **Neighborhood rule** (`fire.hotspots` in the city pack): a detection of `min_confidence` (default nominal) or higher
+  within `alert_km` (5) of a tile is **alert**, within `watch_km` (15) **watch**; low-confidence or farther detections
+  are shown but do not count.
+- **Heat:** NWS heat index now and 12-hour forecast peak (watch ≥ 103 F, alert ≥ 108 F) plus NWS heat / red flag / fire
+  weather alerts.
+- **Hazard Board fire tile:** nearest fire station, the two nearest cooling centers and, when within `watch_km`, the
+  nearest hotspot (`fire.context`; county reference layers, information only). Messages add a fire/heat tip in EN/ES/HT
+  (templates; Grok writes them when `XAI_API_KEY` is set).
+- **Fire view** (map side panel, 🔥): shows only fire layers (hotspots, fire stations, cooling centers, urban heat island
+  overlay) with a legend and a live summary.
+- **Dry-day demo:** with `DEMO_MODE=1`, `fire.demo_hotspots` adds one **SIMULATED** hotspot (Everglades edge west of
+  Doral). It has its own source (`demo_fire`, never mixed into `nasa_firms`), `extra.simulated = true`, a SIMULATED
+  headline, a dashed yellow ring and popup tag, and is named in the page banner.
 
 ### Basemap: Mapbox (optional)
 

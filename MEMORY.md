@@ -3,7 +3,7 @@
 Facts about this project that are easy to forget and slow to rediscover. Not a changelog (that is git) and not a
 status board (that is [DELIVERY.md](DELIVERY.md)). Plan: [PLAN.md](PLAN.md). Open items: [TO-DO.md](TO-DO.md).
 
-_Last updated: Sat Oct 10, 2026, 1:40 PM ET._
+_Last updated: Sat Oct 10, 2026, 2:15 PM ET._
 
 ## Context
 
@@ -84,3 +84,13 @@ _Last updated: Sat Oct 10, 2026, 1:40 PM ET._
   `forces/base.applies_to`, so a fire station never turns a tile's fire badge from `unknown` to `ok`.
 - `MAPBOX_TOKEN` is read from env and sent to the browser via `/api/config` only if it starts with `pk.`. Never put
   the token in a tracked file; on Render it is a `sync: false` secret.
+- Fire hotspot status is per tile, not per observation: `forces/fire.status_for` uses distance + confidence from
+  `fire.hotspots`. The engine supports optional per-force hooks `status_for`, `annotate` and `context`
+  (`forces/engine.py`); forces without them behave as before.
+- FIRMS: one request per product (`fire.firms.sources`); the area API returns a header-only CSV when there are no
+  fires, and text starting with "Invalid" for a bad key. MODIS confidence is 0-100, VIIRS is l/n/h; both are
+  normalised in `adapters/fire/firms.norm_confidence`. Most days Miami-Dade has 0 detections: use the demo hotspot.
+- The SIMULATED fire hotspot is stored under `S.obs["demo_fire"]` (source `demo_fire`), never inside `nasa_firms`,
+  and is empty when `DEMO_MODE` is off.
+- Fire view in the dashboard turns off the non-fire overlays and restores them on exit; the heat-island overlay id is
+  hard-coded as `mdc_heat_islands` in `web/app.js`.
