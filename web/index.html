@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FourForces Watch</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">◉</span> FourForces Watch <small id="cityName"></small></div>
+  <nav>
+    <button class="tab active" data-tab="map">Map</button>
+    <button class="tab" data-tab="board">Hazard Board</button>
+    <button class="tab" data-tab="data">Open data / API</button>
+    <button class="tab" data-tab="status">Status</button>
+  </nav>
+  <div class="meta"><span id="lastRefresh">loading…</span> <button id="refreshBtn" title="Refresh now">↻</button></div>
+</header>
+<div id="demoBanner" class="demo-banner hidden">DEMO / SIMULATED: some camera images are replaced with archived, openly licensed Miami flood photos (CC0, Wikimedia Commons) to show detection on a dry day. Grok still analyses them live.</div>
+<main>
+  <section id="tab-map" class="tabpane active">
+    <div id="map"></div>
+    <aside id="side">
+      <div class="layers">
+        <label><input type="checkbox" data-force="water" checked> <span class="f water">Water</span></label>
+        <label><input type="checkbox" data-force="air" checked> <span class="f air">Air</span></label>
+        <label><input type="checkbox" data-force="land" checked> <span class="f land">Land</span></label>
+        <label><input type="checkbox" data-force="fire" checked> <span class="f fire">Fire</span></label>
+        <label><input type="checkbox" id="onlyChecked"> checked cameras only</label>
+      </div>
+      <div id="tideBox" class="card"></div>
+      <div id="camSummary" class="card"></div>
+      <h3>Area-wide alerts</h3>
+      <div id="areaAlerts"></div>
+      <div class="legend">
+        <span><i class="dot grey"></i>not checked</span><span><i class="dot ok"></i>dry</span>
+        <span><i class="dot watch"></i>possible water</span><span><i class="dot alert"></i>water on road</span>
+      </div>
+    </aside>
+  </section>
+  <section id="tab-board" class="tabpane">
+    <div class="board-head">
+      <div>Neighborhood status from public sensors and official alerts. Messages written by <b id="msgModel">Grok</b>.</div>
+      <div class="langs"><button class="lang active" data-lang="en">English</button><button class="lang" data-lang="es">Español</button><button class="lang" data-lang="ht">Kreyòl</button></div>
+    </div>
+    <div id="tiles"></div>
+    <p class="small">Not an official warning system. Always follow the National Weather Service and county emergency management.</p>
+  </section>
+  <section id="tab-data" class="tabpane">
+    <div class="data">
+      <h2>Open endpoints</h2>
+      <ul>
+        <li><a href="/api/observations" target="_blank">/api/observations?force=water|air|land|fire</a>: every observation in one common schema</li>
+        <li><a href="/api/geojson" target="_blank">/api/geojson</a>: GeoJSON FeatureCollection</li>
+        <li><a href="/api/cap" target="_blank">/api/cap</a>: watch/alert items as OASIS CAP 1.2 XML</li>
+        <li><a href="/api/board" target="_blank">/api/board</a>: neighborhood Hazard Board</li>
+        <li><a href="/api/status" target="_blank">/api/status</a>: feed health</li>
+        <li><a href="/docs" target="_blank">/docs</a>: interactive API docs</li>
+      </ul>
+      <p class="small">Camera snapshots: FL511 / Florida DOT, shown by direct link and analysed in memory only (never stored). Tide: NOAA CO-OPS. Gauges: USGS. Alerts: NWS. Storms: NHC. Disasters: OpenFEMA. Evacuation zones: Miami-Dade County GIS. AI: Grok via the xAI API.</p>
+    </div>
+  </section>
+  <section id="tab-status" class="tabpane">
+    <div class="data">
+      <h2>Live status <small class="small" id="statusRefreshed"></small></h2>
+      <div id="aiStatus" class="card"></div>
+      <h3>Feeds (from <a href="/api/status" target="_blank">/api/status</a>)</h3>
+      <table id="feeds"><thead><tr><th>Feed</th><th>Force</th><th>State</th><th>Items</th><th>Last fetch</th><th>Last success</th><th>Time</th><th>Error / note</th></tr></thead><tbody></tbody></table>
+      <p class="small">Delivery tracking for the hackathon lives in DELIVERY.md in the repository.</p>
+    </div>
+  </section>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
