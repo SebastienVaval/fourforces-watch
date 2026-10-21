@@ -2,8 +2,6 @@
 import re
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / "web" / "index.html").read_text()
 JS = (ROOT / "web" / "app.js").read_text()
@@ -32,7 +30,7 @@ def test_simulated_labels_kept():
     assert "SIMULATED evacuation order" in HTML
 
 
-def test_force_query_schema_and_filter():
+def test_force_query_schema_and_filter(signed_in):
     """force= stays an optional documented enum and does not 422 unknown values."""
     import app
     from core.schema import FORCES, Observation, Place
@@ -51,7 +49,7 @@ def test_force_query_schema_and_filter():
     ]
     app.S.obs["test_force"] = obs
     try:
-        c = TestClient(app.app)
+        c = signed_in
         water = c.get("/api/observations", params={"force": "water", "source": "test_force"})
         assert water.status_code == 200 and [o["place"]["id"] for o in water.json()] == ["w"]
         unknown = c.get("/api/observations", params={"force": "not-a-force", "source": "test_force"})
@@ -62,13 +60,13 @@ def test_force_query_schema_and_filter():
         app.S.obs.pop("test_force", None)
 
 
-def test_js_endpoints_exist_and_serve():
+def test_js_endpoints_exist_and_serve(signed_in):
     import app
     paths = {r.path for r in app.app.routes}
     called = set(re.findall(r"""['"`](/api/[a-z_]+)""", JS))
     assert {"/api/status", "/api/observations", "/api/board", "/api/config", "/api/overlays", "/api/refresh"} <= called
     assert called <= paths, called - paths
-    c = TestClient(app.app)  # no lifespan: no background refresh / network
+    c = signed_in  # no lifespan: no background refresh / network
     assert c.get("/").status_code == 200 and 'id="landViewBtn"' in c.get("/").text
     assert c.get("/static/app.js").status_code == 200
     b = c.get("/api/board").json()

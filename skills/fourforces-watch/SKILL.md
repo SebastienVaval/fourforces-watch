@@ -41,5 +41,6 @@ where `status` is `ok | watch | alert | unknown`.
 | `GET /api/status` | feed health / missing keys |
 
 ## Edge cases
+- The server requires a signed-in session. Unauthenticated `/api/*` calls return 401. `GET /healthz` stays open. `scripts/query.py` does not sign in.
 - `status: unknown` on a camera means it was not checked yet (or no xAI key). It does **not** mean dry.
 - Evacuation order flags from the county layer are shown as `watch` with "confirm with official channels". Never present them as an order.

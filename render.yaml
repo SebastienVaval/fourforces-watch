@@ -16,6 +16,13 @@ services:
         value: grok-4.20-0309-non-reasoning
       - key: XAI_API_KEY
         sync: false
+      # Required for the dashboard. No values here: if any is unset, nobody can sign in.
+      - key: DASHBOARD_USERNAME
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: DASHBOARD_SESSION_SECRET
+        sync: false
       - key: MAPBOX_TOKEN
         sync: false
       - key: FIRMS_MAP_KEY

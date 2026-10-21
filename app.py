@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from adapters.base import SkipAdapter, discover  # noqa: E402
+from core.auth import install as install_auth  # noqa: E402
 from core import arcgis  # noqa: E402
 from core.city import load_city  # noqa: E402
 from core.http import client  # noqa: E402
@@ -317,7 +318,7 @@ def api_overlay(overlay_id: str):
         raise HTTPException(502, f"overlay source failed: {str(e)[:200]}")
     if fc is None:
         raise HTTPException(404, "overlay not found")
-    return JSONResponse(fc, media_type="application/geo+json", headers={"Cache-Control": "public, max-age=3600"})
+    return JSONResponse(fc, media_type="application/geo+json", headers={"Cache-Control": "private, max-age=3600"})
 
 
 def _force_query():
@@ -392,4 +393,7 @@ app.mount("/static", StaticFiles(directory=ROOT / "web"), name="static")
 
 @app.get("/")
 def index():
-    return FileResponse(ROOT / "web" / "index.html")
+    return FileResponse(ROOT / "web" / "index.html", headers={"Cache-Control": "no-store"})
+
+
+install_auth(app)

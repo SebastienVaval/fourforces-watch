@@ -263,6 +263,24 @@ cameras. Nobody watches the cameras to see whether streets are actually underwat
   another provider or a self-hosted open model.
 - **Terms:** use of the xAI API is subject to xAI's terms of service.
 
+## Sign-in
+
+The map, the other dashboard pages, and every data endpoint require a session. Set these
+environment variables on the host. There is no default password in this repository. If any
+variable is missing or empty, the site fails closed and `/login` explains that it is not configured.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DASHBOARD_USERNAME` | yes | Sign-in name |
+| `DASHBOARD_PASSWORD` | yes | Sign-in password |
+| `DASHBOARD_SESSION_SECRET` | yes | Secret that signs the session cookie. Use a long random string. |
+
+`GET /healthz` stays open for Render's health check. Other pages redirect to `/login`.
+`/api/*`, `/demo-images`, and `/openapi.json` return `401` until the session cookie is present.
+The cookie is `HttpOnly` and `SameSite=Lax`, and `Secure` on HTTPS (including `X-Forwarded-Proto: https`).
+It lasts 12 hours. Changing the password or the session secret invalidates existing sessions.
+**Log out** in the header ends the session. This is not an official warning system.
+
 ## Open API
 
 | Endpoint | Returns |
@@ -276,7 +294,7 @@ cameras. Nobody watches the cameras to see whether streets are actually underwat
 | `GET /api/status` | feed health (last fetch / last success / count / error), AI status, demo flag |
 | `GET /api/overlays` · `GET /api/overlays/{id}` | county open-data overlay list · one overlay as GeoJSON |
 | `GET /api/config` | front-end config: public Mapbox token (if set), style, open-data attribution |
-| `GET /healthz` · `/docs` | liveness · OpenAPI docs |
+| `GET /healthz` · `/docs` | liveness (no sign-in) · OpenAPI docs (sign-in required) |
 
 One schema for everything:
 ```json

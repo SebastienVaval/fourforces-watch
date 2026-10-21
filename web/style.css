@@ -42,3 +42,13 @@ main{flex:1;min-height:0}.tabpane{display:none;height:100%}.tabpane.active{displ
 .board-meta{margin:6px 0 10px;display:flex;flex-direction:column;gap:4px}
 .board-meta .srcline{color:#94a3b8}
 .badge.overall{outline:1px solid #e2e8f0}
+a.logout{margin-left:8px;color:#e2e8f0;text-decoration:none;background:#1f2937;border:1px solid #334155;border-radius:6px;padding:6px 12px;font-size:14px}
+a.logout:hover{border-color:#0ea5e9}
+.login-main{display:flex;align-items:center;justify-content:center;padding:32px 16px}
+.login-card{width:min(100%,420px)}
+.login-card h2{margin:0 0 8px}
+.login-card label{display:block;margin:12px 0 4px;color:#94a3b8;font-size:13px}
+.login-card input[type=text],.login-card input[type=password]{width:100%;background:#0b1220;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:8px 10px;font:inherit}
+.login-card button{width:100%;margin-top:16px;background:#0ea5e9;color:#fff;border:1px solid #0ea5e9;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer}
+.login-error{background:#7f1d1d;color:#fecaca;border-radius:6px;padding:8px 10px;margin:8px 0}
+.login-note{background:#1f2937;border:1px solid #334155;border-radius:6px;padding:8px 10px;margin:8px 0;line-height:1.45}
