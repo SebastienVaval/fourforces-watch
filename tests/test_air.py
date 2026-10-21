@@ -82,7 +82,9 @@ def test_airnow_window_format():
 
 
 def test_purpleair_parse_and_fetch(monkeypatch):
+    purpleair._cache.clear()
     monkeypatch.delenv("PURPLEAIR_API_KEY", raising=False)
+    monkeypatch.delenv("PURPLEAIR_REFRESH_SECONDS", raising=False)
     with pytest.raises(SkipAdapter, match="PURPLEAIR_API_KEY"):
         purpleair.fetch(load_city("miami"))
     monkeypatch.setenv("PURPLEAIR_API_KEY", "pa-key")
@@ -91,13 +93,71 @@ def test_purpleair_parse_and_fetch(monkeypatch):
     obs = purpleair.fetch(load_city("miami"))
     req = seen[0]
     assert req.headers["X-API-Key"] == "pa-key" and req.url.params["location_type"] == "0"
-    assert "pm2.5_cf_1" in req.url.params["fields"] and "humidity" in req.url.params["fields"]
+    assert req.url.params["fields"] == purpleair.FIELDS
+    assert set(purpleair.FIELD_COST) == set(purpleair.FIELDS.split(","))
+    for unused in ("temperature", "pm1.0", "pm10.0", "pm2.5_atm", "pressure", "voc", "humidity_a"):
+        assert unused not in purpleair.FIELDS.split(",")
     assert float(req.url.params["nwlat"]) > float(req.url.params["selat"])
     assert [o.place.id for o in obs] == ["purpleair-101", "purpleair-102"]  # low-confidence sensor dropped
     a, b = obs
     assert a.extra["epa_corrected"] and a.extra["pm25_ugm3"] == _aqi.epa_correct(60.0, 70)
     assert not b.extra["epa_corrected"] and b.value == _aqi.pm25_to_aqi(12.0)
     assert a.extra["kind"] == "aqi_sensor"
+
+
+def test_purpleair_polls_on_its_own_interval(monkeypatch):
+    purpleair._cache.clear()
+    monkeypatch.setenv("PURPLEAIR_API_KEY", "pa-key")
+    monkeypatch.delenv("PURPLEAIR_REFRESH_SECONDS", raising=False)
+    seen = []
+    _mock(monkeypatch, purpleair, PA_JSON, seen=seen)
+    city = load_city("miami")
+    first = purpleair.fetch(city)
+    second = purpleair.fetch(city)
+    assert len(seen) == 1
+    assert [o.place.id for o in second] == [o.place.id for o in first]
+    assert second[0].value == first[0].value and second[0].extra["epa_corrected"]
+
+    ck = purpleair._cache_key(city)
+    ts, tag, cached = purpleair._cache[ck]
+    purpleair._cache[ck] = (ts - purpleair.refresh_seconds() - 1, tag, cached)
+    third = purpleair.fetch(city)
+    assert len(seen) == 2 and [o.place.id for o in third] == [o.place.id for o in first]
+
+    monkeypatch.setenv("PURPLEAIR_REFRESH_SECONDS", "0")
+    purpleair.fetch(city)
+    assert len(seen) == 3
+
+    monkeypatch.setenv("PURPLEAIR_API_KEY", "other-key")
+    monkeypatch.delenv("PURPLEAIR_REFRESH_SECONDS", raising=False)
+    purpleair.fetch(city)
+    assert len(seen) == 4 and seen[-1].headers["X-API-Key"] == "other-key"
+    monkeypatch.delenv("PURPLEAIR_API_KEY")
+    with pytest.raises(SkipAdapter, match="PURPLEAIR_API_KEY"):
+        purpleair.fetch(city)
+    assert purpleair._cache_key(city) not in purpleair._cache
+
+
+def test_purpleair_refresh_seconds_and_point_estimate():
+    import os
+    from pathlib import Path
+    assert purpleair.DEFAULT_REFRESH_S == 1800
+    old = os.environ.pop("PURPLEAIR_REFRESH_SECONDS", None)
+    try:
+        assert purpleair.refresh_seconds() == 1800
+    finally:
+        if old is not None:
+            os.environ["PURPLEAIR_REFRESH_SECONDS"] = old
+    assert sum(purpleair.FIELD_COST.values()) == 11
+    n = purpleair.EXAMPLE_SENSORS
+    per_call = purpleair.points_per_call(n)
+    assert per_call == 5 + 11 * n
+    assert purpleair.points_per_day(n, 300) == 318_240
+    assert purpleair.points_per_day(n, 1800) == 53_040
+    assert purpleair.points_per_day(n, 3600) == 26_520
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
+    assert "318,240" in readme and "53,040" in readme and "26,520" in readme
+    assert "PURPLEAIR_REFRESH_SECONDS" in readme
 
 
 def test_tile_rule_median_then_airnow():

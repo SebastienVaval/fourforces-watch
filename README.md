@@ -55,7 +55,7 @@ flowchart TB
 | Air | [NHC CurrentStorms.json](https://www.nhc.noaa.gov/CurrentStorms.json) | no | active storms + distance to city |
 | Air | NWS alerts | no | wind / tropical / tornado / air quality |
 | Air | [EPA AirNow](https://docs.airnowapi.org/) `/aq/data/` (bbox, last 3 h, `dataType=A`) | free key | official hourly AQI per monitor and pollutant (PM2.5, ozone, PM10) |
-| Air | [PurpleAir](https://api.purpleair.com/) v1 `/sensors` (outdoor, bbox) | key | neighborhood PM2.5 → AQI (US EPA correction, EPA 2024 breakpoints) |
+| Air | [PurpleAir](https://api.purpleair.com/) v1 `/sensors` (outdoor, bbox, default every 30 min) | key | neighborhood PM2.5 → AQI (US EPA correction, EPA 2024 breakpoints) |
 | Land | Miami-Dade GIS: [evacuation zones](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/HurricaneEvacZone_gdb/FeatureServer/0), [order flags](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationOrder/FeatureServer/0), [open shelters](https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/EvacuationCenterShelters_Open/FeatureServer/0) | no | zone per neighborhood; order flags shown as "confirm with official channels" |
 | Land | [OpenFEMA declarations](https://www.fema.gov/openfema-data-page/disaster-declarations-summaries-v2) | no | active disaster declarations for the county |
 | Land | [USGS earthquakes](https://earthquake.usgs.gov/fdsnws/event/1/) | no | generic; for reuse in other cities |
@@ -122,7 +122,33 @@ shelters layer is already polled by `evac_zones` and appears automatically when 
   - `AIRNOW_API_KEY`: free, request at <https://docs.airnowapi.org/account/request/>.
   - `PURPLEAIR_API_KEY`: a PurpleAir **read** key from <https://develop.purpleair.com/> (sign in, create a project, then
     a read key; usage uses PurpleAir points).
+  - `PURPLEAIR_REFRESH_SECONDS`: how often PurpleAir is polled. Default **1800** (30 minutes). `0` polls on every app
+    refresh (`REFRESH_SECONDS`, default 5 minutes). Other feeds keep the 5-minute refresh.
   The Status tab shows "needs AIRNOW_API_KEY" / "needs PURPLEAIR_API_KEY" until they are set.
+- **PurpleAir points.** A new key starts with 1,000,000 points
+  ([PurpleAir's formula](https://community.purpleair.com/t/api-pricing/4523):
+  `endpoint base + field cost × sensors returned`). `GET /v1/sensors` has a base of 5. This adapter requests only the
+  eight fields the map and the AQI rule use. `sensor_index` comes back automatically and is not requested. Averaged
+  readings cost 2 points per sensor; station fields cost 1
+  ([field prices](https://community.purpleair.com/t/how-to-make-efficient-api-calls/6906)):
+
+  | Points per sensor | Fields |
+  |---|---|
+  | 1 | `name`, `latitude`, `longitude`, `last_seen`, `confidence` |
+  | 2 | `pm2.5_10minute`, `pm2.5_cf_1`, `humidity` |
+
+  That is **11 points per sensor + 5 per call**. PurpleAir bills every outdoor sensor the bbox returns (those seen
+  within `max_age_s`). `max_sensors` only trims the list afterward, so it does not lower the point cost.
+  Illustrative count of **100 sensors** returned:
+
+  | Interval | Calls/day | Points/day | 1,000,000 points lasts about |
+  |---|---|---|---|
+  | 5 min (the old app refresh) | 288 | 318,240 | 3 days |
+  | 30 min (default) | 48 | 53,040 | 19 days |
+  | 60 min (`PURPLEAIR_REFRESH_SECONDS=3600`) | 24 | 26,520 | 38 days |
+
+  `last_seen` is counted at 1 point with the other station fields. The developer dashboard is the live price if
+  PurpleAir changes a field. Between polls the last result stays on the map.
 - **Dry-day demo:** with `DEMO_MODE=1` **and** both AQI feeds off, `air.demo_sensors` adds three **SIMULATED** sensors
   (one Unhealthy for Sensitive Groups near Doral). Own source `demo_air`, `extra.simulated = true`, SIMULATED names and
   headlines, dashed yellow rings, banner text. They disappear as soon as a real AQI feed is live.
