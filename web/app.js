@@ -6,6 +6,15 @@ let STATUS = null, OBS = [], BOARD = null, lang = 'en', markers = {};
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const fmt = iso => iso ? new Date(iso).toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '—';
 
+async function apiFetch(url, opts) {
+  const r = await globalThis.fetch(url, opts);
+  if (r.status === 401) {
+    location.assign('/login?next=' + encodeURIComponent(location.pathname + location.search));
+    throw new Error('not signed in');
+  }
+  return r;
+}
+
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b));
   document.querySelectorAll('.tabpane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + b.dataset.tab));
@@ -41,7 +50,7 @@ function overlayStyle(m) {
 }
 async function initMapLayers() {
   let cfg = {};
-  try { cfg = await (await fetch('/api/config')).json(); } catch (e) { /* keep OSM fallback */ }
+  try { cfg = await (await apiFetch('/api/config')).json(); } catch (e) { /* keep OSM fallback */ }
   const base = {};
   if (cfg.mapbox_token) {
     base['Mapbox ' + cfg.mapbox_style.split('/').pop()] = mapboxLayer(cfg.mapbox_style, cfg.mapbox_token);
@@ -54,7 +63,7 @@ async function initMapLayers() {
   const attribution = (cfg.open_data && cfg.open_data.attribution) || '';
   const over = {};
   let metas = [];
-  try { metas = await (await fetch('/api/overlays')).json(); } catch (e) { /* no overlays */ }
+  try { metas = await (await apiFetch('/api/overlays')).json(); } catch (e) { /* no overlays */ }
   for (const m of metas) {
     const lyr = L.geoJSON(null, {style: overlayStyle(m), attribution,
       onEachFeature: (f, l) => l.bindPopup(`<div class="popup"><b>${esc(m.name)}</b><br>` +
@@ -63,7 +72,7 @@ async function initMapLayers() {
     lyr.on('add', async () => {
       if (lyr._loaded) return;
       lyr._loaded = true;
-      try { lyr.addData(await (await fetch('/api/overlays/' + encodeURIComponent(m.id))).json()); lyr.bringToBack(); }
+      try { lyr.addData(await (await apiFetch('/api/overlays/' + encodeURIComponent(m.id))).json()); lyr.bringToBack(); }
       catch (e) { lyr._loaded = false; }
     });
     over[`<span class="f ${esc(m.force)}">${esc(LABEL[m.force] || m.force)}</span> ${esc(m.name)}`] = lyr;
@@ -139,7 +148,7 @@ function cameraPopup(o) {
 async function checkCam(id, btn) {
   btn.disabled = true; btn.textContent = 'Asking Grok…';
   try {
-    const j = await (await fetch(`/api/cameras/${encodeURIComponent(id)}/check`, {method: 'POST'})).json();
+    const j = await (await apiFetch(`/api/cameras/${encodeURIComponent(id)}/check`, {method: 'POST'})).json();
     const i = OBS.findIndex(o => o.place.id === id);
     if (i >= 0) OBS[i] = j.camera;
     renderMap(); renderSide();
@@ -447,7 +456,7 @@ function renderFeeds() {
 }
 
 async function load() {
-  const [s, o, b] = await Promise.all(['/api/status', '/api/observations', '/api/board'].map(u => fetch(u).then(r => r.json())));
+  const [s, o, b] = await Promise.all(['/api/status', '/api/observations', '/api/board'].map(u => apiFetch(u).then(r => r.json())));
   const first = !STATUS;
   STATUS = s; OBS = o; BOARD = b;
   document.getElementById('cityName').textContent = s.city.name;
@@ -460,7 +469,7 @@ async function load() {
   else if (b.ai_pending) setTimeout(load, 15000);  // Grok messages / camera checks still landing
 }
 document.getElementById('refreshBtn').onclick = async () => {
-  await fetch('/api/refresh', {method: 'POST'});
+  await apiFetch('/api/refresh', {method: 'POST'});
   document.getElementById('lastRefresh').textContent = 'refreshing…';
   setTimeout(load, 8000);
 };

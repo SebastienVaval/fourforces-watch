@@ -17,9 +17,14 @@ Recommended for the judging demo: `DEMO_MODE=1`.
 ## Option B: Render, free web service
 1. New > Blueprint > select the GitHub repo (it reads `render.yaml`).
 2. Enter `XAI_API_KEY` when prompted. The free plan sleeps when idle, so open the URL a minute before the demo.
+3. Set `DASHBOARD_USERNAME`, `DASHBOARD_PASSWORD`, and `DASHBOARD_SESSION_SECRET` (a long random string).
+   All three are required. If any is missing, the login page says sign-in is not configured and no one gets in.
+   `GET /healthz` stays open for the Render health check (`healthCheckPath` in `render.yaml`).
 
 ## Option C: anywhere with Docker
 ```bash
 docker build -t fourforces-watch .
-docker run -p 8000:7860 -e XAI_API_KEY=... -e DEMO_MODE=1 fourforces-watch
+docker run -p 8000:7860 -e XAI_API_KEY=... -e DEMO_MODE=1 \
+  -e DASHBOARD_USERNAME=... -e DASHBOARD_PASSWORD=... -e DASHBOARD_SESSION_SECRET=... \
+  fourforces-watch
 ```

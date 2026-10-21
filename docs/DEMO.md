@@ -5,7 +5,7 @@
    `DEMO_MODE=1 uvicorn app:app --port 8000`, or the hosted URL with `DEMO_MODE=1`.
 2. Make sure `XAI_API_KEY` is set, so Grok checks the cameras and writes the messages. Wait about 30 s for the first
    refresh, until the **Status** tab shows feeds as `live` and "cameras checked" > 0.
-3. Open http://localhost:8000. Check that:
+3. Open http://localhost:8000 and sign in (`DASHBOARD_USERNAME` / `DASHBOARD_PASSWORD`, plus `DASHBOARD_SESSION_SECRET` on the server). Check that:
    - the orange **DEMO / SIMULATED** banner is visible;
    - 5 cameras with a yellow ring are red.
 4. Check the live hooks on the **Status** and **Map** tabs:
