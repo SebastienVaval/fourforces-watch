@@ -32,6 +32,36 @@ def test_simulated_labels_kept():
     assert "SIMULATED evacuation order" in HTML
 
 
+def test_force_query_schema_and_filter():
+    """force= stays an optional documented enum and does not 422 unknown values."""
+    import app
+    from core.schema import FORCES, Observation, Place
+
+    schema = app.app.openapi()
+    for path in ("/api/observations", "/api/geojson", "/api/cap"):
+        params = {p["name"]: p for p in schema["paths"][path]["get"]["parameters"]}
+        assert params["force"]["required"] is False
+        assert params["force"]["schema"]["enum"] == list(FORCES)
+
+    obs = [
+        Observation(force="water", source="test_force", place=Place(id="w", name="W", lat=1, lon=2),
+                    time="2026-10-21T00:00:00Z", measurement="m", status="ok"),
+        Observation(force="fire", source="test_force", place=Place(id="f", name="F", lat=1, lon=2),
+                    time="2026-10-21T00:00:00Z", measurement="m", status="alert"),
+    ]
+    app.S.obs["test_force"] = obs
+    try:
+        c = TestClient(app.app)
+        water = c.get("/api/observations", params={"force": "water", "source": "test_force"})
+        assert water.status_code == 200 and [o["place"]["id"] for o in water.json()] == ["w"]
+        unknown = c.get("/api/observations", params={"force": "not-a-force", "source": "test_force"})
+        assert unknown.status_code == 200 and unknown.json() == []
+        assert c.get("/api/geojson", params={"force": "fire"}).status_code == 200
+        assert c.get("/api/cap", params={"force": "water"}).status_code == 200
+    finally:
+        app.S.obs.pop("test_force", None)
+
+
 def test_js_endpoints_exist_and_serve():
     import app
     paths = {r.path for r in app.app.routes}
