@@ -33,7 +33,7 @@ water:
 
 air:
   airnow: {parameters: "PM25,OZONE,PM10", hours: 3}   # /aq/data/ monitors in bbox, latest hour each
-  purpleair: {max_sensors: 60, max_age_s: 3600, min_confidence: 50}   # outdoor sensors in bbox
+  purpleair: {max_sensors: 60, max_age_s: 3600, min_confidence: 50}   # outdoor sensors in bbox; poll interval is PURPLEAIR_REFRESH_SECONDS
   aqi_watch: 101             # EPA "Unhealthy for Sensitive Groups"
   aqi_alert: 151             # EPA "Unhealthy"
   sensor_radius_km: 5        # tile AQI = median of sensors within this radius, else AirNow area AQI

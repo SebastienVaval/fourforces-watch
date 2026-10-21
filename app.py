@@ -320,8 +320,18 @@ def api_overlay(overlay_id: str):
     return JSONResponse(fc, media_type="application/geo+json", headers={"Cache-Control": "public, max-age=3600"})
 
 
+def _force_query():
+    """Optional ``force`` filter. The enum is OpenAPI documentation only.
+
+    FastAPI 0.155 removed unknown ``Query`` keywords, so ``Query(..., enum=...)``
+    raises TypeError at import. ``json_schema_extra`` keeps the same schema and
+    the same runtime behavior: any string is accepted, and an unknown force matches nothing.
+    """
+    return Query(None, json_schema_extra={"enum": list(FORCES)})
+
+
 @app.get("/api/observations")
-def api_observations(force: str | None = Query(None, enum=list(FORCES)), status: str | None = None,
+def api_observations(force: str | None = _force_query(), status: str | None = None,
                      source: str | None = None):
     return [o.to_dict() for o in _filter(force, status, source)]
 
@@ -354,12 +364,12 @@ def api_board():
 
 
 @app.get("/api/geojson")
-def api_geojson(force: str | None = Query(None, enum=list(FORCES)), status: str | None = None):
+def api_geojson(force: str | None = _force_query(), status: str | None = None):
     return JSONResponse(to_geojson(_filter(force, status)), media_type="application/geo+json")
 
 
 @app.get("/api/cap")
-def api_cap(force: str | None = Query(None, enum=list(FORCES))):
+def api_cap(force: str | None = _force_query()):
     xml = to_cap(_filter(force, "watch,alert"), sender=f"fourforces-watch.{S.city['id']}", area_name=S.city["name"])
     return Response(xml, media_type="application/xml")
 
