@@ -1,0 +1,7 @@
+# Direct dependencies. Install the lock: pip install -r requirements.txt
+# Regenerate the lock with: pip-compile requirements.in -o requirements.txt
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27
+python-dotenv>=1.0
+pyyaml>=6.0

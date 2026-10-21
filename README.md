@@ -177,6 +177,8 @@ python -m scripts.check_feeds   # live / needs key / failing, per feed
 uvicorn app:app --port 8000     # http://localhost:8000
 DEMO_MODE=1 uvicorn app:app --port 8000   # dry-day demo (clearly labelled SIMULATED)
 ```
+`requirements.txt` is a pinned lock compiled from `requirements.in`, so a fresh install matches the versions the tests ran against. Regenerate it with `pip-compile requirements.in -o requirements.txt` after changing a direct dependency.
+
 Tests: `pip install pytest && pytest -q` · classify one photo: `python -m scripts.classify_image photo.jpg` ·
 hosting: [DEPLOY.md](DEPLOY.md) (Docker, Hugging Face Spaces, Render).
 
