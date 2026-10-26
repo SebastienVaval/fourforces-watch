@@ -21,8 +21,10 @@ Recommended for the judging demo: `DEMO_MODE=1`.
    All three are required. If any is missing, the login page says sign-in is not configured and no one gets in.
    `GET /healthz` stays open for the Render health check (`healthCheckPath` in `render.yaml`).
 4. Error monitoring: set secret `SENTRY_DSN` (Sentry project DSN). The service still boots if it is empty;
-   Sentry stays off. Optional: `SENTRY_ENVIRONMENT` (default `production`) and
-   `SENTRY_TRACES_SAMPLE_RATE` (default `0.1`). Leave `SENTRY_DEBUG_ROUTE` unset. Set it to `1` only long
+   Sentry stays off. Optional: `SENTRY_ENVIRONMENT` (default `production`),
+   `SENTRY_TRACES_SAMPLE_RATE` (default `0.1`), and `ADAPTER_TRANSIENT_FAILURES_BEFORE_SENTRY` (default `3`,
+   how many refresh cycles a 5xx, 429, timeout, or dropped connection must last before Sentry is notified).
+   Other feed errors are reported on the first poll. Leave `SENTRY_DEBUG_ROUTE` unset. Set it to `1` only long
    enough to open `https://<your-service>/sentry-debug`, confirm the error in Sentry, then remove it.
 
 ## Option C: anywhere with Docker

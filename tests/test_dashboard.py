@@ -25,6 +25,12 @@ def test_board_legend_updated_sources_and_chips():
     assert "(t.message || {})[lang]" in JS and all(f'data-lang="{l}"' in HTML for l in ("en", "es", "ht"))
 
 
+def test_stale_feed_is_labelled_in_the_dashboard():
+    assert "function feedPill" in JS and "pill stale" in JS and "v.stale && v.transient" in JS
+    assert "stale, last good reading" in JS and "g.stale" in JS
+    assert "pill.stale" in (ROOT / "web" / "style.css").read_text()
+
+
 def test_simulated_labels_kept():
     assert JS.count("SIMULATED") >= 8 and "demo_air" in JS
     assert "SIMULATED evacuation order" in HTML

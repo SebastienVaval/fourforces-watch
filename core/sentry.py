@@ -113,16 +113,20 @@ def init_sentry() -> bool:
     return True
 
 
-def report_adapter_failure(exc: BaseException, adapter: str, force: str) -> None:
+def report_adapter_failure(exc: BaseException, adapter: str, force: str, **tags: str) -> None:
     """Send a caught adapter error to Sentry.
 
     No-op when the SDK is off. Callers still log the failure and keep the
     previous observations. ``SkipAdapter`` is a configuration skip, so callers
-    leave it out of this path.
+    leave it out of this path. A transient upstream failure (HTTP 5xx, 429,
+    timeout, connection error) is reported only after it has lasted for several
+    polls; callers make that decision before calling.
     """
     if not sentry_sdk.is_initialized():
         return
     with sentry_sdk.new_scope() as scope:
         scope.set_tag("adapter", adapter)
         scope.set_tag("force", force)
+        for key, value in tags.items():
+            scope.set_tag(key, str(value))
         sentry_sdk.capture_exception(exc)

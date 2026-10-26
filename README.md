@@ -218,8 +218,9 @@ Optional. Sentry starts only when `SENTRY_DSN` is set. With an empty DSN the SDK
 | `SENTRY_ENVIRONMENT` | Environment name on each event, once a DSN is set. | `production` |
 | `SENTRY_TRACES_SAMPLE_RATE` | Fraction of requests recorded as performance traces, from 0 to 1. | `0.1` |
 | `SENTRY_DEBUG_ROUTE` | Set to `1` to expose `GET /sentry-debug`, which raises on purpose so you can confirm the project received an event. The route is public only while the flag is `1`. | off |
+| `ADAPTER_TRANSIENT_FAILURES_BEFORE_SENTRY` | How many refresh cycles a transient upstream failure must last before Sentry is notified. | `3` |
 
-A feed that throws (AirNow, PurpleAir, and the other adapters) is still caught: the status tab keeps the error, the previous observations stay up, and the refresh continues. When Sentry is on, that exception is reported too, tagged with the adapter name. A missing key stays `SkipAdapter` and is recorded as a skip.
+A feed that throws (AirNow, PurpleAir, USGS, and the other adapters) is still caught: the refresh continues, and the previous observations stay up. The shared HTTP client retries a short upstream failure (HTTP 408, 425, 429, or 5xx, plus a timeout or a dropped connection) with exponential backoff and jitter before giving up on that poll. If the feed is still down, the last good readings stay on the map with `extra.stale = true` and the status tab shows **stale**. That blip is a warning in the log. Sentry is notified when the same transient failure lasts for `ADAPTER_TRANSIENT_FAILURES_BEFORE_SENTRY` polls in a row, and on the first poll for anything else (other HTTP 4xx, a response we cannot parse, an unexpected exception). A missing key stays `SkipAdapter` and is recorded as a skip, not an error.
 
 ### Reuse it in another city
 

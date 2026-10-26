@@ -161,6 +161,7 @@ function popupFor(o) {
   const ex = o.extra || {};
   return `<div class="popup"><b>${esc(o.place.name)}</b><br>${esc(LABEL[o.force])} · ${esc(o.measurement)}<br>
     Value: <b>${esc(o.value)} ${esc(o.unit || '')}</b> · <span class="st ${o.status}">${esc(o.status)}</span>
+    ${ex.stale ? '<br><span class="st watch">Stale reading: source unavailable, last good value.</span>' : ''}
     ${ex.headline ? '<br>' + esc(ex.headline) : ''}${ex.rise_3h_ft != null ? '<br>3-hour change: ' + ex.rise_3h_ft + ' ft' : ''}
     ${ex.link ? `<br><a href="${esc(ex.link)}" target="_blank" rel="noopener">source</a>` : ''}
     <div class="small">${esc(o.source)} · ${fmt(o.time)}</div></div>`;
@@ -190,6 +191,7 @@ function aqiPopup(o) {
   return `<div class="popup"><b>${esc(ex.simulated ? 'AQI sensor (demo)' : o.place.name)}</b><br>
     ${ex.simulated ? '<div class="sim">SIMULATED AQI (demo)</div>' : ''}
     AQI <b style="color:${aqiColor(o.value)}">${esc(o.value)}</b> · ${esc(ex.category || '')}<br>
+    ${ex.stale ? '<span class="st watch">Stale reading: source unavailable, last good value.</span><br>' : ''}
     <span class="small">${esc(o.measurement)}${ex.pm25_ugm3 != null ? ` · PM2.5 ${esc(ex.pm25_ugm3)} µg/m³` : ''}
     ${ex.network ? ' · ' + esc(ex.network) : ''} · ${fmt(o.time)}</span>
     ${ex.note ? `<div class="small">${esc(ex.note)}</div>` : ''}
@@ -203,6 +205,7 @@ function renderWater() {
   const cams = OBS.filter(o => o.source === 'fl511_cameras'), n = st => cams.filter(c => c.status === st).length;
   const sim = cams.filter(c => c.extra.simulated).length;
   const g = OBS.filter(o => o.source === 'usgs_gauges'), gw = g.filter(o => o.status !== 'ok');
+  const usgs = STATUS && STATUS.adapters && STATUS.adapters.usgs_gauges;
   const t = tide(), al = OBS.filter(o => o.force === 'water' && o.source.startsWith('nws_'));
   const nh = t && t.extra.next_high;
   box.innerHTML = `<h4>Water view</h4>
@@ -212,7 +215,7 @@ function renderWater() {
     <div>Cameras: <b>${cams.length}</b> · <span style="color:${COLORS.alert}">${n('alert')} water</span> · <span style="color:${COLORS.watch}">${n('watch')} possible</span>
       · <span style="color:${COLORS.ok}">${n('ok')} dry</span> · ${n('unknown')} not checked${sim ? ` · <span class="sim">${sim} SIMULATED images</span>` : ''}
       ${STATUS && !STATUS.ai.key_present ? '<div class="small">No XAI_API_KEY: cameras stay "not checked".</div>' : ''}</div>
-    <div>USGS canal gauges: <b>${g.length}</b>${gw.length ? ` · <span class="st watch">${gw.length} rising fast / above threshold</span>` : ' · none rising fast'}</div>
+    <div>USGS canal gauges: <b>${g.length}</b>${usgs && usgs.stale ? ' · <span class="st watch">stale, last good reading</span>' : ''}${gw.length ? ` · <span class="st watch">${gw.length} rising fast / above threshold</span>` : ' · none rising fast'}</div>
     <div>NWS flood / coastal / surge alerts: <b>${al.length}</b>${al.map(a => `<div class="small">${esc(a.measurement)}</div>`).join('')}</div>
     <div class="legend"><span><i class="dot grey"></i>camera not checked</span><span><i class="dot ok"></i>dry</span>
       <span><i class="dot watch"></i>possible water</span><span><i class="dot alert"></i>water on road</span>
@@ -232,7 +235,7 @@ function renderAir() {
   const storms = OBS.filter(o => o.source === 'nhc_storms');
   const wind = OBS.filter(o => o.force === 'air' && o.source.startsWith('nws_'));
   const ad = n => STATUS && STATUS.adapters[n];
-  const feed = n => { const a = ad(n); return a ? (a.ok ? `<span class="pill ok">live</span> ${a.count}` : `<span class="pill skip">${esc(needsKey(a.skipped) || 'off')}</span>`) : '—'; };
+  const feed = n => { const a = ad(n); return a ? `${feedPill(a)}${a.count != null ? ' ' + a.count : ''}` : '—'; };
   box.innerHTML = `<h4>Air view</h4>
     <div>AirNow: ${feed('airnow')} · PurpleAir: ${feed('purpleair')}</div>
     <div>AQI sensors: <b>${sens.length - sim.length}</b> real${sim.length ? ` · <span class="sim">${sim.length} SIMULATED</span>` : ''}
@@ -277,7 +280,7 @@ function renderBoardMeta() {
   document.getElementById('boardUpdated').textContent = fmt(STATUS.last_refresh);
   const by = {};
   Object.values(STATUS.adapters || {}).forEach(a => (by[a.force] = by[a.force] || []).push(
-    `${esc(a.name)}${a.ok ? '' : ' <i>(' + esc(a.skipped ? needsKey(a.skipped) || 'off' : 'error') + ')</i>'}`));
+    `${esc(a.name)}${feedNote(a) ? ' <i>(' + esc(feedNote(a)) + ')</i>' : ''}`));
   document.getElementById('boardSources').innerHTML = ['water', 'air', 'land', 'fire'].map(f =>
     `<div class="srcline">${ICON[f]} <b>${LABEL[f]}</b>: ${(by[f] || []).join(', ') || '—'}</div>`).join('');
 }
@@ -390,7 +393,7 @@ function waterCtx(c) {
   return `<div class="waterctx">${fz ? `<div>FEMA flood zone <b>${esc(fz.zone)}</b> <span class="small">${esc(fz.meaning || '')}</span></div>` : ''}
     ${td && td.applies ? `<div>Tide <b>${esc(td.ft)} ft</b> ${esc(td.trend || '')}${td.next_high ? ` · next high ${fmt(td.next_high.time)} ≈ ${esc(td.next_high.projected_ft)} ft` : ''}</div>` : ''}
     ${cam ? `<div>Camera <b>${esc(cam.name)}</b> ${cam.km} km: <span class="st ${cam.status}">${esc(cam.verdict)}</span>${cam.simulated ? ' <span class="sim">SIMULATED</span>' : ''}</div>` : ''}
-    ${g ? `<div>Gauge <b>${esc(g.name)}</b> ${g.km} km: ${esc(g.ft)} ft (${g.rise_3h_ft >= 0 ? '+' : ''}${esc(g.rise_3h_ft)} ft / 3 h)</div>` : ''}</div>`;
+    ${g ? `<div>Gauge <b>${esc(g.name)}</b> ${g.km} km: ${esc(g.ft)} ft (${g.rise_3h_ft >= 0 ? '+' : ''}${esc(g.rise_3h_ft)} ft / 3 h)${g.stale ? ' <span class="st watch">stale</span>' : ''}</div>` : ''}</div>`;
 }
 
 function airCtx(c) {
@@ -440,6 +443,17 @@ function renderBoard() {
 }
 
 const needsKey = msg => { const m = /([A-Z][A-Z0-9_]*_(?:KEY|TOKEN))/.exec(msg || ''); return m ? 'needs ' + m[1] : null; };
+function feedPill(v) {
+  if (v.ok) return '<span class="pill ok">live</span>';
+  if (v.skipped) return `<span class="pill skip">${esc(needsKey(v.skipped) || 'off')}</span>`;
+  if (v.stale && v.transient) return '<span class="pill stale">stale</span>';
+  return '<span class="pill err">error</span>';
+}
+function feedNote(a) {
+  if (!a || a.ok) return '';
+  if (a.stale && a.transient) return 'stale';
+  return a.skipped ? (needsKey(a.skipped) || 'off') : 'error';
+}
 
 function renderFeeds() {
   const ai = STATUS.ai;
@@ -450,7 +464,7 @@ function renderFeeds() {
   document.getElementById('statusRefreshed').textContent = 'page updated ' + fmt(new Date().toISOString());
   const rows = Object.entries(STATUS.adapters).sort((a, b) => a[1].force.localeCompare(b[1].force));
   document.querySelector('#feeds tbody').innerHTML = rows.map(([k, v]) => `<tr><td>${esc(k)}<div class="small">${esc(v.doc || '')}</div></td>
-    <td>${esc(v.force)}</td><td><span class="pill ${v.ok ? 'ok' : v.skipped ? 'skip' : 'err'}">${v.ok ? 'live' : v.skipped ? esc(needsKey(v.skipped) || 'off') : 'error'}</span></td>
+    <td>${esc(v.force)}</td><td>${feedPill(v)}</td>
     <td>${v.count ?? ''}</td><td>${fmt(v.last_run)}</td><td>${fmt(v.last_ok)}</td><td>${v.ms != null ? v.ms + ' ms' : ''}</td>
     <td class="small">${esc(v.skipped || v.error || '')}</td></tr>`).join('');
 }
