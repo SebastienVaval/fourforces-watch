@@ -1,7 +1,9 @@
 # Direct dependencies. Install the lock: pip install -r requirements.txt
-# Regenerate the lock with: pip-compile requirements.in -o requirements.txt
+# Regenerate the lock with:
+#   pip-compile --output-file=requirements.txt --strip-extras requirements.in
 fastapi>=0.110
 uvicorn>=0.29
 httpx>=0.27
 python-dotenv>=1.0
 pyyaml>=6.0
+sentry-sdk[fastapi]>=2.0

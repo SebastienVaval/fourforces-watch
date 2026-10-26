@@ -31,3 +31,10 @@ services:
         sync: false
       - key: PURPLEAIR_API_KEY
         sync: false
+      # Error monitoring. Leave SENTRY_DSN empty in the dashboard to keep Sentry off.
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.1"

@@ -16,10 +16,13 @@ certifi==2026.10.19
     # via
     #   httpcore
     #   httpx
+    #   sentry-sdk
 click==8.5.0
     # via uvicorn
 fastapi==0.156.4
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   sentry-sdk
 h11==0.16.0
     # via
     #   httpcore
@@ -42,6 +45,8 @@ python-dotenv==1.2.4
     # via -r requirements.in
 pyyaml==6.0.3
     # via -r requirements.in
+sentry-sdk==2.73.0
+    # via -r requirements.in
 starlette==1.9.0
     # via fastapi
 typing-extensions==4.16.0
@@ -57,5 +62,7 @@ typing-inspection==0.4.4
     # via
     #   fastapi
     #   pydantic
+urllib3==2.8.0
+    # via sentry-sdk
 uvicorn==0.54.0
     # via -r requirements.in

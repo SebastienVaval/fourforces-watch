@@ -202,7 +202,11 @@ def test_tampered_and_expired_cookies_are_rejected():
     assert auth.verify_token(token, cfg, now=1_700_000_000) == cfg.username
     assert auth.verify_token(token, cfg, now=1_700_000_000 + auth.SESSION_TTL - 1) == cfg.username
     assert auth.verify_token(token, cfg, now=1_700_000_000 + auth.SESSION_TTL) is None
-    flipped = token[:-1] + ("a" if token[-1] != "a" else "b")
+    # The last base64 character of the MAC can change without changing the
+    # decoded digest, so flip the first character of the signature instead.
+    body_b64, mac_b64 = token.split(".", 1)
+    flipped_mac = ("A" if not mac_b64.startswith("A") else "B") + mac_b64[1:]
+    flipped = body_b64 + "." + flipped_mac
     assert auth.verify_token(flipped, cfg, now=1_700_000_000) is None
     renamed = auth.AuthConfig("other-user", cfg.password, cfg.session_secret)
     assert auth.verify_token(token, renamed, now=1_700_000_000) is None

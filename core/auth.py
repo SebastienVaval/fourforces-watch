@@ -205,6 +205,10 @@ def _parse_form(raw: bytes) -> dict[str, str]:
 def classify(path: str) -> str:
     """public: no session. data: 401 JSON. page: redirect to /login."""
     p = path if path == "/" else path.rstrip("/")
+    # The verification route is registered only while this flag is 1, and it
+    # has to be reachable without a session so a curl confirms the Sentry event.
+    if p == "/sentry-debug" and os.getenv("SENTRY_DEBUG_ROUTE", "").strip() == "1":
+        return "public"
     if p in ("/healthz", "/login", "/logout") or p == "/static" or path.startswith("/static/"):
         return "public"
     if p == "/api" or path.startswith("/api/") or p == "/demo-images" or path.startswith("/demo-images/") or p == "/openapi.json":
