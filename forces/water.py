@@ -52,4 +52,6 @@ def context(hood, observations, city) -> dict:
         d, o = g[0]
         out["gauge"] = {"name": o.place.name, "km": round(d, 1), "ft": o.value, "rise_3h_ft": o.extra.get("rise_3h_ft"),
                         "status": o.status}
+        if o.extra.get("stale"):
+            out["gauge"]["stale"] = True
     return out

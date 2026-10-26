@@ -25,7 +25,7 @@ from adapters.base import SkipAdapter, discover  # noqa: E402
 from core.auth import install as install_auth  # noqa: E402
 from core import arcgis  # noqa: E402
 from core.city import load_city  # noqa: E402
-from core.http import client  # noqa: E402
+from core.http import client, is_transient, should_report, transient_failures_before_sentry  # noqa: E402
 from core.schema import FORCES, Observation, to_cap, to_geojson, utcnow_iso  # noqa: E402
 from core.sentry import init_sentry, report_adapter_failure  # noqa: E402
 from demo import demo_mode  # noqa: E402
@@ -75,13 +75,33 @@ def _run_adapter(mod):
     t0 = time.time()
     try:
         res = mod.fetch(S.city)
-        return mod, res, {"ok": True, "count": len(res), "ms": int((time.time() - t0) * 1000)}
+        return mod, res, {"ok": True, "count": len(res), "ms": int((time.time() - t0) * 1000),
+                          "consecutive_failures": 0}
     except SkipAdapter as e:
         return mod, [], {"ok": False, "skipped": str(e)}
     except Exception as e:  # one bad feed never takes the app down
-        log.warning("adapter %s failed: %s", mod.NAME, e)
-        report_adapter_failure(e, mod.NAME, getattr(mod, "FORCE", ""))
-        return mod, None, {"ok": False, "error": str(e)[:200]}
+        transient = is_transient(e)
+        with S.lock:
+            prev = int(S.adapter_status.get(mod.NAME, {}).get("consecutive_failures") or 0)
+            kept = bool(S.obs.get(mod.NAME))
+        streak = prev + 1
+        if transient:
+            # Warning, not an error event: a 503 is the upstream, and Sentry
+            # hears about it only once the streak reaches the threshold.
+            log.warning(
+                "adapter %s transient upstream failure (%s/%s)%s: %s",
+                mod.NAME, streak, transient_failures_before_sentry(),
+                "; keeping last good data" if kept else "; no previous data", e,
+            )
+        else:
+            log.warning("adapter %s failed: %s", mod.NAME, e, exc_info=True)
+        if should_report(e, streak):
+            report_adapter_failure(
+                e, mod.NAME, getattr(mod, "FORCE", ""),
+                consecutive_failures=str(streak), transient="true" if transient else "false",
+            )
+        return mod, None, {"ok": False, "error": str(e)[:200], "transient": transient,
+                           "consecutive_failures": streak, "ms": int((time.time() - t0) * 1000)}
 
 
 def _fetch_image(cam: Observation) -> tuple[bytes, str] | None:
@@ -89,7 +109,7 @@ def _fetch_image(cam: Observation) -> tuple[bytes, str] | None:
         p = Path(cam.extra["local_image"])
         return (p.read_bytes(), "image/jpeg") if p.exists() else None
     try:  # transient, in memory only: FL511 snapshots are never written to disk
-        with client(timeout=10) as c:
+        with client(timeout=10, retry=False) as c:
             r = c.get(cam.extra["image_url"])
         if r.status_code != 200 or len(r.content) < 2000:
             return None
@@ -208,11 +228,17 @@ def refresh():
             for mod, res, st in results:
                 prev = S.adapter_status.get(mod.NAME, {})
                 now = utcnow_iso()
+                if res is not None:
+                    S.obs[mod.NAME] = res
+                elif "skipped" not in st and S.obs.get(mod.NAME):
+                    # The source missed this poll. Keep serving the last good
+                    # readings and say so, instead of blanking the map.
+                    for obs in S.obs[mod.NAME]:
+                        obs.extra["stale"] = True
+                    st = st | {"stale": True, "count": len(S.obs[mod.NAME])}
                 S.adapter_status[mod.NAME] = st | {"name": mod.NAME, "force": mod.FORCE, "last_run": now,
                                                    "last_ok": now if st["ok"] else prev.get("last_ok"),
                                                    "doc": (mod.__doc__ or "").strip().splitlines()[0]}
-                if res is not None:
-                    S.obs[mod.NAME] = res
         with S.lock:  # simulated hotspots live under their own key, never inside nasa_firms
             S.obs["demo_fire"] = demo_mode.fire_hotspots(S.city) if demo_mode.enabled() else []
             S.obs["demo_land"] = demo_mode.land_evac_orders(S.city) if demo_mode.enabled() else []
