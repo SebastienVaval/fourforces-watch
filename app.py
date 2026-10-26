@@ -27,6 +27,7 @@ from core import arcgis  # noqa: E402
 from core.city import load_city  # noqa: E402
 from core.http import client  # noqa: E402
 from core.schema import FORCES, Observation, to_cap, to_geojson, utcnow_iso  # noqa: E402
+from core.sentry import init_sentry, report_adapter_failure  # noqa: E402
 from demo import demo_mode  # noqa: E402
 from detect import grok, messages  # noqa: E402
 from forces.engine import board as build_board  # noqa: E402
@@ -34,6 +35,9 @@ from forces.engine import board as build_board  # noqa: E402
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger("app")
+# Before the FastAPI app exists, so the FastAPI integration can attach.
+# Empty SENTRY_DSN leaves the SDK uninitialized.
+init_sentry()
 ROOT = Path(__file__).resolve().parent
 REFRESH = int(os.getenv("REFRESH_SECONDS", "300"))
 MAX_CLASSIFY = int(os.getenv("MAX_CLASSIFY", "12"))  # cameras sent to Grok per refresh cycle
@@ -76,6 +80,7 @@ def _run_adapter(mod):
         return mod, [], {"ok": False, "skipped": str(e)}
     except Exception as e:  # one bad feed never takes the app down
         log.warning("adapter %s failed: %s", mod.NAME, e)
+        report_adapter_failure(e, mod.NAME, getattr(mod, "FORCE", ""))
         return mod, None, {"ok": False, "error": str(e)[:200]}
 
 
@@ -396,4 +401,25 @@ def index():
     return FileResponse(ROOT / "web" / "index.html", headers={"Cache-Control": "no-store"})
 
 
+_SENTRY_DEBUG_PATH = "/sentry-debug"
+
+
+def install_sentry_debug_route() -> None:
+    """Expose GET /sentry-debug only when SENTRY_DEBUG_ROUTE=1.
+
+    The route raises on purpose so a deploy can confirm Sentry received the
+    event. It is absent otherwise.
+    """
+    app.router.routes[:] = [
+        route for route in app.router.routes if getattr(route, "path", None) != _SENTRY_DEBUG_PATH
+    ]
+    if os.getenv("SENTRY_DEBUG_ROUTE", "").strip() != "1":
+        return
+
+    @app.get(_SENTRY_DEBUG_PATH, include_in_schema=False)
+    def sentry_debug():
+        1 / 0
+
+
 install_auth(app)
+install_sentry_debug_route()

@@ -203,10 +203,23 @@ python -m scripts.check_feeds   # live / needs key / failing, per feed
 uvicorn app:app --port 8000     # http://localhost:8000
 DEMO_MODE=1 uvicorn app:app --port 8000   # dry-day demo (clearly labelled SIMULATED)
 ```
-`requirements.txt` is a pinned lock compiled from `requirements.in`, so a fresh install matches the versions the tests ran against. Regenerate it with `pip-compile requirements.in -o requirements.txt` after changing a direct dependency.
+`requirements.txt` is a pinned lock compiled from `requirements.in`, so a fresh install matches the versions the tests ran against. Regenerate it with `pip-compile --output-file=requirements.txt --strip-extras requirements.in` after changing a direct dependency.
 
 Tests: `pip install pytest && pytest -q` · classify one photo: `python -m scripts.classify_image photo.jpg` ·
 hosting: [DEPLOY.md](DEPLOY.md) (Docker, Hugging Face Spaces, Render).
+
+### Error monitoring (Sentry)
+
+Optional. Sentry starts only when `SENTRY_DSN` is set. With an empty DSN the SDK stays uninitialized, so local dev, tests, and `DEMO_MODE` keep their current behavior. The DSN is read from the environment and is never stored in this repo. `send_default_pii` stays off, local variables are left out of events, and known API keys are stripped from event text.
+
+| Variable | When it is used | Default |
+|---|---|---|
+| `SENTRY_DSN` | Project DSN from [sentry.io](https://sentry.io). Empty disables monitoring. | empty |
+| `SENTRY_ENVIRONMENT` | Environment name on each event, once a DSN is set. | `production` |
+| `SENTRY_TRACES_SAMPLE_RATE` | Fraction of requests recorded as performance traces, from 0 to 1. | `0.1` |
+| `SENTRY_DEBUG_ROUTE` | Set to `1` to expose `GET /sentry-debug`, which raises on purpose so you can confirm the project received an event. The route is public only while the flag is `1`. | off |
+
+A feed that throws (AirNow, PurpleAir, and the other adapters) is still caught: the status tab keeps the error, the previous observations stay up, and the refresh continues. When Sentry is on, that exception is reported too, tagged with the adapter name. A missing key stays `SkipAdapter` and is recorded as a skip.
 
 ### Reuse it in another city
 
